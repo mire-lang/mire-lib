@@ -4,7 +4,7 @@ module std
 // that only wants the flat names does not have to know they exist.
 load mire::std::out
 load mire::std::err
-load mire::std::input
+load mire::std::in
 
 // Standard input, output and error.
 //
@@ -27,106 +27,68 @@ load mire::std::input
   extern fn rt_io_flush: (selector :i64) :i64 lib "c"
 
   // ── out ────────────────────────────────────────────────────────────────────
-  //
-  // NOTE ON THE `set x = ...; return x` SHAPE BELOW
-  //
-  // Those intermediate locals are load-bearing, not redundant, and this comment
-  // exists so the next person to read them does not delete them. Collapsing a
-  // flat alias back to a single `return out::print(s)` makes this module stop
-  // compiling:
-  //
-  //     error[E0015] Runtime Error
-  //     ╰─ llc failed: use of undefined value '@std.println'
-  //
-  // The cause is a compiler bug, not something about this library. When several
-  // one-line delegating functions in one module have the same shape — the same
-  // parameter list, one call, one return — the backend drops the definition of
-  // one of them and leaves the call site pointing at a symbol that was never
-  // emitted. It is reproducible with two functions whose bodies differ only in
-  // which function they call, and it needs a loaded module to trigger: the same
-  // four functions in a single self-contained file compile fine.
-  //
-  // Routing each result through a local before returning gives the bodies
-  // distinct shapes, which sidesteps it. The same trick is what out:: and err::
-  // use for their stream selector. Until the bug is fixed upstream, keep these
-  // locals: this module failing to build is otherwise a mystifying regression
-  // for anyone who tidies up a function they are not using.
 
-  // Write text to stdout with no trailing newline.
-  pub fn print: (s :&str) :i64 {
-    set written = out::print(s)
-    return written
-}
+// Write text to stdout with no trailing newline.
+pub fn print: (s :&str) :i64 { return out::print(s) }
 
 // Write text to stdout followed by a newline.
-pub fn println: (s :&str) :i64 {
-    set written = out::println(s)
-    return written
-}
+pub fn println: (s :&str) :i64 { return out::println(s) }
 
 // Write an integer to stdout followed by a newline.
-pub fn print_i64: (value :i64) :i64 {
-    set written = out::print_i64(value)
-    return written
-}
+pub fn print_i64: (value :i64) :i64 { return out::print_i64(value) }
+
+// Write an integer to stdout with no trailing newline.
+pub fn print_i64_no_newline: (value :i64) :i64 { return out::print_i64_no_newline(value) }
 
 // Write a float to stdout followed by a newline.
-pub fn print_f64: (value :f64) :i64 {
-    set written = out::print_f64(value)
-    return written
-}
+pub fn print_f64: (value :f64) :i64 { return out::print_f64(value) }
+
+// Write a float to stdout with no trailing newline.
+pub fn print_f64_no_newline: (value :f64) :i64 { return out::print_f64_no_newline(value) }
 
 // ── err ────────────────────────────────────────────────────────────────────
 
 // Write text to stderr with no trailing newline. The unprefixed spelling is
 // write, so a diagnostic never has to be labelled as an error to be seen.
-pub fn eprint: (s :&str) :i64 {
-    set written = err::print(s)
-    return written
-}
+pub fn eprint: (s :&str) :i64 { return err::print(s) }
 
 // Write text to stderr followed by a newline.
-pub fn eprintln: (s :&str) :i64 {
-    set written = err::println(s)
-    return written
-}
+pub fn eprintln: (s :&str) :i64 { return err::println(s) }
 
 // Write an integer to stderr followed by a newline.
-pub fn eprint_i64: (value :i64) :i64 {
-    set written = err::print_i64(value)
-    return written
-}
+pub fn eprint_i64: (value :i64) :i64 { return err::print_i64(value) }
 
-  // ── in ─────────────────────────────────────────────────────────────────────
-  //
-  // The read aliases below are already distinct enough to compile, so they are
-  // left as plain one-line delegations. The note above applies to them only if
-  // a future change makes two of them share a shape.
+// Write an integer to stderr with no trailing newline.
+pub fn eprint_i64_no_newline: (value :i64) :i64 { return err::print_i64_no_newline(value) }
 
-  // Read one line from stdin, without its trailing newline.
-  pub fn read_line: () :str { return input::line() }
+// Write a float to stderr followed by a newline.
+pub fn eprint_f64: (value :f64) :i64 { return err::print_f64(value) }
+
+// Write a float to stderr with no trailing newline.
+pub fn eprint_f64_no_newline: (value :f64) :i64 { return err::print_f64_no_newline(value) }
+
+// ── in ─────────────────────────────────────────────────────────────────────
+
+// Read one line from stdin, without its trailing newline.
+pub fn read_line: () :str { return in::line() }
 
 // Read up to `count` bytes from stdin. Use str::len on the result to learn how
 // many actually arrived.
-pub fn read_bytes: (count :i64) :str { return input::bytes(count) }
+pub fn read_bytes: (count :i64) :str { return in::bytes(count) }
 
 // Read stdin to end of input. Binary safe.
-pub fn read_all: () :str { return input::all() }
+pub fn read_all: () :str { return in::all() }
 
 // Read one byte, or -1 at end of input.
-pub fn read_byte: () :i64 {
-    set written = input::byte()
-    return written
-}
+pub fn read_byte: () :i64 { return in::byte() }
 
-// Bytes waiting on stdin without blocking, or 0 when nothing is ready.
-pub fn available: () :i64 {
-    set written = input::available()
-    return written
-}
+// True when stdin has input waiting, counting bytes this process has already
+// buffered as well as bytes still on the descriptor. Safe to loop on: a drain
+// loop written as `while available() > 0` sees every byte exactly once.
+pub fn available: () :i64 { return in::available() }
 
 // True when stdin is an interactive terminal.
-pub fn is_tty: () :bool { return input::is_tty() }
+pub fn is_tty: () :bool { return in::is_tty() }
 
 // ── both ───────────────────────────────────────────────────────────────────
 

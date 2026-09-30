@@ -94,41 +94,41 @@ load mire::str
 
 // ── input ──────────────────────────────────────────────────────────────────
 
-@[test] pub fn input_all_on_empty_input_is_empty: () :bool {
+@[test] pub fn in_all_on_empty_input_is_empty: () :bool {
     // Whatever stdin holds, reading it to the end must terminate. Under `mire
     // test` this is normally /dev/null, so the result is the empty string; the
     // point is that the call returns at all rather than blocking or erroring.
-    set rest = input::all()
+    set rest = in::all()
     return str::len(rest) >= 0
 }
 
-@[test] pub fn input_bytes_zero_reads_nothing: () :bool {
-    set nothing = input::bytes(0)
+@[test] pub fn in_bytes_zero_reads_nothing: () :bool {
+    set nothing = in::bytes(0)
     return str::len(nothing) == 0
 }
 
-@[test] pub fn input_line_returns_a_managed_string: () :bool {
-    set l = input::line()
+@[test] pub fn in_line_returns_a_managed_string: () :bool {
+    set l = in::line()
     return str::len(l) >= 0
 }
 
-@[test] pub fn input_available_is_never_negative: () :bool {
+@[test] pub fn in_available_is_never_negative: () :bool {
     // 0 means nothing is ready. Negative would mean the poll failed, which the
     // runtime never reports, so this also pins that contract.
-    return input::available() >= 0
+    return in::available() >= 0
 }
 
-@[test] pub fn input_is_tty_is_false_under_test: () :bool {
+@[test] pub fn in_is_tty_is_false_under_test: () :bool {
     // `mire test` does not attach a terminal to the test binary, so this must be
     // false. It is the check that a program can branch on "am I interactive".
-    return input::is_tty() == false
+    return in::is_tty() == false
 }
 
-@[test] pub fn input_byte_after_drain_is_eof: () :bool {
+@[test] pub fn in_byte_after_drain_is_eof: () :bool {
     // Drain stdin, then the next single-byte read must report end of input with
     // -1 rather than 0, so a binary protocol can tell EOF from a NUL byte.
-    set rest = input::all()
-    return input::byte() == -1
+    set rest = in::all()
+    return in::byte() == -1
 }
 
 // ── flat aliases on the parent module ──────────────────────────────────────
@@ -144,7 +144,7 @@ load mire::str
 }
 
 @[test] pub fn flat_is_tty_matches_stream: () :bool {
-    return std::is_tty() == input::is_tty()
+    return std::is_tty() == in::is_tty()
 }
 
 @[test] pub fn flat_read_byte_is_eof_after_drain: () :bool {

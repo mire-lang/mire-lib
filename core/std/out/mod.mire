@@ -10,13 +10,10 @@ module out
 // payload read from a file can be echoed back unchanged. Each write returns the
 // number of bytes written, or -1 if the stream rejected it.
 //
-// NOTE ON THE `sel` LOCAL: the selector is bound to a local rather than passed as
-// a literal at every call site. That is a workaround for a compiler bug in which
-// two functions whose bodies differ only in a constant argument collapse into a
-// single emitted definition, leaving the other one referenced but never defined
-// ("use of undefined value"). Binding the selector keeps each body distinct. It
-// also documents which stream is meant at every call, which is worth having
-// anyway. Tracked upstream; safe to inline away once it is fixed.
+// ON THE `sel` LOCAL: the selector is bound to a named local rather than passed
+// as a bare literal at each call site, so a reader can see which stream a call
+// targets without counting to the argument list. It is a readability choice, not
+// a workaround.
 
 // ── C runtime ─────────────────────────────────────────────────────────────
 extern fn rt_io_write: (selector :i64, data :&str) :i64 lib "c"
@@ -71,6 +68,13 @@ pub fn print_i64: (value :i64) :i64 {
 pub fn print_f64: (value :f64) :i64 {
     set sel = 1
     return rt_io_write_f64(sel value 1)
+}
+
+// Write a float with no trailing newline, in the same shortest round-tripping
+// form as print_f64.
+pub fn print_f64_no_newline: (value :f64) :i64 {
+    set sel = 1
+    return rt_io_write_f64(sel value 0)
 }
 
 // ── stream state ───────────────────────────────────────────────────────────

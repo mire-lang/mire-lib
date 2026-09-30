@@ -6,7 +6,7 @@ Standard library for the [Mire](https://github.com/mire-lang) programming langua
 
 | Module | Description |
 |--------|-------------|
-| `mire::std` | Standard streams: `input` (stdin), `out` (stdout), `err` (stderr) |
+| `mire::std` | Standard streams: `in` (stdin), `out` (stdout), `err` (stderr) |
 | `mire::vec` | Vector operations (`push::i64`, `get`, `set`, `len`, `sort`, etc.) |
 | `mire::map` | Map/dictionary operations (`get::i64`, `set::i64`, `has`, `keys`, `values`, `count`) |
 | `mire::str` | String operations (`len`, `upper`, `lower`, `split`, `join`, `pad`, `from::bool`, etc.) |
@@ -46,15 +46,18 @@ pub fn main: () {
 - **Explicit module loading**: use `load mire::<module>`; the package entry is
   intentionally not an aggregate re-export.
 - **Thin wrappers**: each function wraps a single runtime C function (`rt_*`)
-- **Standard streams live in `mire::std`**: `input`, `out` and `err`, or the
-  flat `std::print` / `std::read_line` / `std::flush` forms. The module is
-  `input` rather than `in` because `in` is a reserved keyword and
-  `load mire::std::in` does not parse. Writes go through the C `FILE*` rather
-  than the raw descriptor so that stream writes and `printf`-based output
-  interleave in call order. Reads are binary-safe and never truncate at a NUL:
-  `byte()` returns `-1` at end of input, so EOF is distinguishable from a zero
-  byte. Writes return the number of bytes written, not `0`/`1`, so a short
-  write is detectable.
+- **Standard streams live in `mire::std`**: `in`, `out` and `err`, or the
+  flat `std::print` / `std::read_line` / `std::flush` forms. The module is named
+  `in` to match the `for`/`find` iterator, and requires Avenys `v4.3.2`
+  ([PR #33](https://github.com/mire-lang/Avenys-rust/pull/33)), which accepts the
+  `in` keyword as a module name, a load path segment and a call head. Writes go
+  through the C `FILE*` rather than the raw descriptor so that stream writes and
+  `printf`-based output interleave in call order. Reads are binary-safe and never
+  truncate at a NUL: `byte()` returns `-1` at end of input, so EOF is
+  distinguishable from a zero byte. `available()` answers from the runtime's own
+  buffer first, so a reader that trusts it will not block on bytes that have
+  already been read. Writes return the number of bytes written, not `0`/`1`, so a
+  short write is detectable.
 - **Growing collections return the new value**: `vec::push`, `map::set`, and
   `map::merge` may reallocate the backing storage, so they return the collection
   and you reassign (`set v = vec::push::i64(v 42)`). Read-only functions
