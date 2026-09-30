@@ -3,6 +3,6 @@ name = "std"
 entry = "mod.mire"
 
 [exports]
-input = "input"
+in = "in"
 out = "out"
 err = "err"

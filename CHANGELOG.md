@@ -2,21 +2,76 @@
 
 All notable changes to the mire standard library.
 
+## [1.2.0] - 2026-09-30 (stdin module renamed to `in`, available() fixed)
+
+### Changed
+
+- **`mire::std::input` is now `mire::std::in`.** `in` is a keyword in the
+  language, and the module was named `input` only to dodge that collision, which
+  left the third standard stream reading as a category rather than a stream next
+  to `out` and `err`. Avenys v4.3.2 ([PR #33](https://github.com/mire-lang/Avenys-rust/pull/33))
+  accepts the `in` keyword as a module name, a load path segment and a call head,
+  so the collision is gone and the module can be named for what it is.
+
+  This is a breaking change to a public module, hence the minor bump. Nothing
+  outside this repository's own tests used `mire::std`, and the module is a day
+  old, so the cost is close to zero — but it is a rename, so it is not shipping
+  as a patch.
+
+  ```mire
+  load mire::std::in
+
+  pub fn main: () {
+      set line = in::line()
+      out::println(line)
+  }
+  ```
+
+### Fixed
+
+- **`in::available()` under-reported, so a program could block on a line that
+  had already been read.** The runtime checked the OS for input with `poll` and
+  never consulted its own buffer. Once `in::line()` had pulled a chunk off the
+  descriptor, the buffered remainder was invisible: `available()` reported
+  nothing, a reader that trusts it waits, and the bytes it is waiting for are
+  already in the process. Availability is now answered from the buffer first,
+  and the descriptor only when the buffer is empty. Reaching EOF also had to set
+  the flag, or `available()` stayed optimistic forever after the input ended.
+
+### Added
+
+- **22 integration cases** in `tests/std_io.sh`, and
+  `out::print_f64_no_newline` / `err::print_f64_no_newline` so a float can be
+  written without a trailing newline as an integer already could.
+
+### Removed
+
+- The `input` -> `in` workaround in the CHANGELOG's design notes, and with it the
+  claim that the flat aliases needed a local to build. They never did. The
+  one-line delegations compile as written; the note described a compiler bug
+  that was not reproducible, and the locals it recommended are gone.
+
+### Requirements
+
+- Avenys `v4.3.2` (PR #33) for `rt_io_*` and for the `in` keyword as a name.
+  The `dasu` flush fix in the same release is what makes a `dasu` and a stream
+  write to one destination interleave in call order.
+
 ## [1.1.0] - 2026-09-30 (standard streams)
 
 ### Added
 
 - **`mire::std`, the three standard streams.** `load mire::std::out`,
-  `load mire::std::err` and `load mire::std::input` expose stdout, stderr and
+  `load mire::std::err` and `load mire::std::in` expose stdout, stderr and
   stdin as a library module rather than leaving every library to reach for libc:
 
   ```mire
   load mire::std::out
   load mire::std::err
-  load mire::std::input
+  load mire::std::in
 
   pub fn main: () {
-      set line = input::line()
+      set line = in::line()
       out::print("got: ")
       out::println(line)
       err::println("done")
@@ -28,23 +83,52 @@ All notable changes to the mire standard library.
   the same functions, not copies, so the two styles cannot drift apart.
 
   - `out` / `err`: `print`, `println`, `write_n`, `print_i64`,
-    `print_i64_no_newline`, `print_f64`, `flush`, `failed`, `clear`, `fd`.
-  - `input`: `line`, `byte`, `bytes`, `all`, `available`, `is_tty`.
+    `print_i64_no_newline`, `print_f64`, `print_f64_no_newline`, `flush`,
+    `failed`, `clear`, `fd`.
+  - `in`: `line`, `byte`, `bytes`, `all`, `available`, `is_tty`.
 
-- **26 tests** in `tests/std_io.mire` covering byte counts, the two output
+- **`tests/std_io.sh`, 22 integration cases.** The unit tests in
+  `tests/std_io.mire` run inside the harness, so they cannot see the process's
+  own streams. This script builds probes against the working tree and asserts on
+  what actually reaches the file descriptors, covering: binary round-trip
+  byte-exactness with embedded NULs, CRLF handling, `available()` reporting
+  buffered bytes rather than hiding them, EOF through every entry point, a NUL
+  read as `0` while the end of input reads as `-1`, the two output streams
+  carrying their own content and nothing else, byte counts that include the
+  newline, stdout and stderr interleaving in call order when they share a
+  destination, and `is_tty()` answering for a pipe.
+
+  It resolves the library from the checkout it lives in rather than a global
+  install, so it tests the working tree.
+
+- **26 unit tests** in `tests/std_io.mire` covering byte counts, the two output
   streams being genuinely distinct, CRLF handling, and EOF-after-drain through
   both the namespaced and the flat entry points.
 
+### Fixed
+
+- **`in::available()` under-reported, so a program could block on a line that
+  had already been read.** The runtime checked the OS for input with `poll` and
+  never consulted its own buffer. Once `in::line()` had pulled a chunk off the
+  descriptor, the buffered remainder was invisible: `available()` reported
+  nothing, a reader that trusts it waits, and the bytes it is waiting for are
+  already in the process. Availability is now answered from the buffer first,
+  and the descriptor only when the buffer is empty. Reaching EOF also had to set
+  the flag, or `available()` stayed optimistic forever after the input ended.
+
 ### Design notes
 
-- **The module is `input`, not `in`.** `in` is a reserved keyword in the lexer,
-  so `load mire::std::in` cannot parse at all. `input` is the shortest spelling
-  that works, and it matches `out` and `err`.
+- **The module is `in`, matching the `for`/`find` iterator.** `in` is a keyword,
+  so this needed the compiler to accept the keyword as a name in three places:
+  the module declaration, the load path, and the head of an expression. It does
+  in Avenys `v4.3.2` (PR #33). The alternative was `input`, and it was rejected
+  for reading as a category rather than a stream, next to `out` and `err`.
 - **Writes go through the C `FILE*`, not the raw descriptor.** A program that
   writes from both a `printf` and a stream write otherwise gets output
   interleaved in the wrong order, because the two paths disagree about where the
   file position is. Routing both through stdio makes them interleave in call
-  order.
+  order. This only works because `dasu` flushes after every call, so stdout is
+  never sitting in a buffer while stderr — unbuffered — goes straight out.
 - **Writes return the byte count, not `0`/`1`.** A caller that cares about a
   short write — a log line, a pipe — otherwise cannot detect one, and finds out
   later as a truncated line.
@@ -53,22 +137,12 @@ All notable changes to the mire standard library.
   `byte()` returns `-1` at end of input, so EOF is distinguishable from a zero
   byte. Lines drop the trailing newline and a preceding `CR`, so CRLF input does
   not leave a stray `\r` on the value.
-- **Requires `rt_io_*` from the compiler runtime** (Avenys `v4.3.2`, in
-  `pr/4.2.0`). The symbols are `rt_`-prefixed, so the `externs = ["rt_*"]`
+- **Requires `rt_io_*` from the compiler runtime** (Avenys `v4.3.2`,
+  PR #33). The symbols are `rt_`-prefixed, so the `externs = ["rt_*"]`
   allowlist in `[security]` already covers them and strict mode needs no change.
-
-### Known issues
-
-- The flat aliases in `core/std/mod.mire` route their result through a local
-  before returning, which looks redundant and is not. Collapsing one back to a
-  single `return out::print(s)` makes the module fail to build with
-  `use of undefined value '@std.println'`. The cause is a compiler bug in which
-  several one-line delegating functions of the same shape in one loaded module
-  drop one another's emitted definition; routing through a local keeps the
-  bodies distinct. It reproduces only in a loaded module — the same functions
-  in a single self-contained file compile fine. Tracked upstream; the locals
-  should be inlined away once it is fixed. The same workaround is why `out::`
-  and `err::` bind their stream selector to a `sel` local.
+  It also requires the `dasu` flush fix from the same release: a `dasu` and a
+  stream write to one destination interleave in call order only if `dasu`
+  actually flushes.
 
 ## [1.0.0] - 2026-09-22 (first stable release)
 
@@ -81,11 +155,6 @@ All notable changes to the mire standard library.
 
 - Bumped library version to 1.0.0.
 - Updated `owl.toml` dependencies and macros sections.
-
-## [0.0.7] - 2026-08-05 (strict security mode)
-# Changelog
-
-All notable changes to the mire standard library.
 
 ## [0.0.7] - 2026-08-05 (strict security mode)
 
