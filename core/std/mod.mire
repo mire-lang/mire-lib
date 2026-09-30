@@ -1,0 +1,113 @@
+module std
+
+// The stream submodules. Loading the parent pulls in all three, so a program
+// that only wants the flat names does not have to know they exist.
+load mire::std::out
+load mire::std::err
+load mire::std::input
+
+// Standard input, output and error.
+//
+// The three streams are the substrate every other part of the standard library
+// sits on: mire::str formatting ends up on stdout, macros::panic and the
+// runtime's own diagnostics end up on stderr, and a program that reads its
+// arguments from a pipe reads stdin. They are exposed as a module rather than
+// left to each library to reach for libc, so there is one definition of what
+// "write a line" means and one place where buffering and flushing are decided.
+//
+// Two ways in, deliberately:
+//
+//   load mire::std::out    explicit, for code that names the stream it means
+//   load mire::std         flat, for code that does not care and wants out::print
+//
+// The flat names are the same functions, not copies, so a program can mix the two
+// styles during a migration without the two forms drifting apart.
+
+// ── C runtime ─────────────────────────────────────────────────────────────
+extern fn rt_io_flush: (selector :i64) :i64 lib "c"
+
+// ── out ────────────────────────────────────────────────────────────────────
+
+// Write text to stdout with no trailing newline.
+pub fn print: (s :&str) :i64 {
+    set written = out::print(s)
+    return written
+}
+
+// Write text to stdout followed by a newline.
+pub fn println: (s :&str) :i64 {
+    set written = out::println(s)
+    return written
+}
+
+// Write an integer to stdout followed by a newline.
+pub fn print_i64: (value :i64) :i64 {
+    set written = out::print_i64(value)
+    return written
+}
+
+// Write a float to stdout followed by a newline.
+pub fn print_f64: (value :f64) :i64 {
+    set written = out::print_f64(value)
+    return written
+}
+
+// ── err ────────────────────────────────────────────────────────────────────
+
+// Write text to stderr with no trailing newline. The unprefixed spelling is
+// write, so a diagnostic never has to be labelled as an error to be seen.
+pub fn eprint: (s :&str) :i64 {
+    set written = err::print(s)
+    return written
+}
+
+// Write text to stderr followed by a newline.
+pub fn eprintln: (s :&str) :i64 {
+    set written = err::println(s)
+    return written
+}
+
+// Write an integer to stderr followed by a newline.
+pub fn eprint_i64: (value :i64) :i64 {
+    set written = err::print_i64(value)
+    return written
+}
+
+// ── in ─────────────────────────────────────────────────────────────────────
+
+// Read one line from stdin, without its trailing newline.
+pub fn read_line: () :str { return input::line() }
+
+// Read up to `count` bytes from stdin. Use str::len on the result to learn how
+// many actually arrived.
+pub fn read_bytes: (count :i64) :str { return input::bytes(count) }
+
+// Read stdin to end of input. Binary safe.
+pub fn read_all: () :str { return input::all() }
+
+// Read one byte, or -1 at end of input.
+pub fn read_byte: () :i64 {
+    set written = input::byte()
+    return written
+}
+
+// Bytes waiting on stdin without blocking, or 0 when nothing is ready.
+pub fn available: () :i64 {
+    set written = input::available()
+    return written
+}
+
+// True when stdin is an interactive terminal.
+pub fn is_tty: () :bool { return input::is_tty() }
+
+// ── both ───────────────────────────────────────────────────────────────────
+
+// Flush both output streams. Returns 0 when both flushed cleanly, -1 otherwise.
+// Exits run this for you; it is here for a program that forks or execs and
+// needs its own output on disk before the child starts.
+pub fn flush: () :i64 {
+    set out_status = rt_io_flush(1)
+    set err_status = rt_io_flush(2)
+    if out_status != 0 { return -1 }
+    return err_status
+}

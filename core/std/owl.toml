@@ -1,0 +1,8 @@
+[project]
+name = "std"
+entry = "mod.mire"
+
+[exports]
+input = "input"
+out = "out"
+err = "err"
