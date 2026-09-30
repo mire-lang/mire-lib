@@ -9,20 +9,3 @@ extern fn rt_panic_loc: (msg :str line :i64 col :i64 file :str) lib "c"
         rt_panic_loc(msg 0 0 "")
     }
 }
-
-@[macro!] pub fn assert_eq: (actual :i64 expected :i64 msg :str) {
-    if actual != expected {
-        rt_panic_loc(msg 0 0 "")
-    }
-}
-
-@[macro!] pub fn assert_ne: (actual :i64 unexpected :i64 msg :str) {
-    if actual == unexpected {
-        rt_panic_loc(msg 0 0 "")
-    }
-}
-
-@[macro!] pub fn trace_i64: (value :i64) :i64 {
-    dasu(value)
-    return value
-}
