@@ -1,0 +1,6 @@
+load mire::json
+
+@[test] pub fn json_load_test: () :bool {
+    // Just test that the module loads without error
+    return true
+}

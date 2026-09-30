@@ -1,0 +1,129 @@
+// JSON module for Mire
+// C parser/serializer with thin Mire API.
+module json
+
+load kioto::strings
+load mire::str
+load mire::vec
+
+// C FFI - parser and serializer
+extern fn c_json_parse: (input :&str) :ptr lib "c"
+extern fn c_json_free: (node :ptr) lib "c"
+extern fn c_json_stringify: (node :ptr) :str lib "c"
+extern fn c_json_type: (node :ptr) :i64 lib "c"
+extern fn c_json_str_val: (node :ptr) :str lib "c"
+extern fn c_json_num_val: (node :ptr) :f64 lib "c"
+extern fn c_json_num_val_i64: (node :ptr) :i64 lib "c"
+extern fn c_json_bool_val: (node :ptr) :i64 lib "c"
+extern fn c_json_arr_len: (node :ptr) :i64 lib "c"
+extern fn c_json_arr_get: (node :ptr, index :i64) :ptr lib "c"
+extern fn c_json_obj_len: (node :ptr) :i64 lib "c"
+extern fn c_json_obj_key: (node :ptr, index :i64) :str lib "c"
+extern fn c_json_obj_val: (node :ptr, index :i64) :ptr lib "c"
+extern fn c_json_obj_get: (node :ptr, key :&str) :ptr lib "c"
+extern fn c_json_new_null: () :ptr lib "c"
+extern fn c_json_new_bool: (b :i64) :ptr lib "c"
+extern fn c_json_new_num: (v :f64) :ptr lib "c"
+extern fn c_json_new_str: (s :&str) :ptr lib "c"
+extern fn c_json_new_arr: () :ptr lib "c"
+extern fn c_json_arr_push: (arr :ptr, val :ptr) lib "c"
+extern fn c_json_new_obj: () :ptr lib "c"
+extern fn c_json_obj_set: (obj :ptr, key :&str, val :ptr) lib "c"
+
+// Type tag constants
+cons TAG_NULL = 0 :i64
+cons TAG_BOOL = 1 :i64
+cons TAG_NUMBER = 2 :i64
+cons TAG_STRING = 3 :i64
+cons TAG_ARRAY = 4 :i64
+cons TAG_OBJECT = 5 :i64
+
+// JsonValue wraps a C JSON tree pointer.
+pub struct JsonValue {
+    node :ptr
+}
+
+// Constructors
+pub fn null: () :JsonValue {
+    return JsonValue(node=c_json_new_null())
+}
+
+pub fn bool_val: (b :bool) :JsonValue {
+    if b {
+        return JsonValue(node=c_json_new_bool(1))
+    } else {
+        return JsonValue(node=c_json_new_bool(0))
+    }
+}
+
+pub fn number: (n :f64) :JsonValue {
+    return JsonValue(node=c_json_new_num(n))
+}
+
+pub fn string_val: (s :str) :JsonValue {
+    return JsonValue(node=c_json_new_str(s))
+}
+
+pub fn array: () :JsonValue {
+    return JsonValue(node=c_json_new_arr())
+}
+
+pub fn object: () :JsonValue {
+    return JsonValue(node=c_json_new_obj())
+}
+
+// Type checks
+pub fn is_null: (v :&JsonValue) :bool { return c_json_type(v.node) == TAG_NULL }
+pub fn is_bool: (v :&JsonValue) :bool { return c_json_type(v.node) == TAG_BOOL }
+pub fn is_number: (v :&JsonValue) :bool { return c_json_type(v.node) == TAG_NUMBER }
+pub fn is_string: (v :&JsonValue) :bool { return c_json_type(v.node) == TAG_STRING }
+pub fn is_array: (v :&JsonValue) :bool { return c_json_type(v.node) == TAG_ARRAY }
+pub fn is_object: (v :&JsonValue) :bool { return c_json_type(v.node) == TAG_OBJECT }
+
+// Getters
+pub fn as_bool: (v :&JsonValue) :bool { return c_json_bool_val(v.node) == 1 }
+pub fn as_number: (v :&JsonValue) :f64 { return c_json_num_val(v.node) }
+
+// Get value as i64 (truncates float to integer)
+pub fn as_i64: (v :&JsonValue) :i64 { return c_json_num_val_i64(v.node) }
+pub fn as_string: (v :&JsonValue) :str { return c_json_str_val(v.node) }
+
+// Array operations
+pub fn array_len: (v :&JsonValue) :i64 { return c_json_arr_len(v.node) }
+
+pub fn array_push: (v :JsonValue, item :JsonValue) :JsonValue {
+    c_json_arr_push(v.node item.node)
+    return v
+}
+
+pub fn array_get: (v :&JsonValue, index :i64) :JsonValue {
+    set node = c_json_arr_get(v.node index)
+    return JsonValue(node=node)
+}
+
+// Object operations
+pub fn object_len: (v :&JsonValue) :i64 { return c_json_obj_len(v.node) }
+
+pub fn object_set: (v :JsonValue, key :str, val :JsonValue) :JsonValue {
+    c_json_obj_set(v.node key val.node)
+    return v
+}
+
+pub fn object_get: (v :&JsonValue, key :&str) :JsonValue {
+    set node = c_json_obj_get(v.node key)
+    if node == 0 {
+        return JsonValue(node=c_json_new_null())
+    }
+    return JsonValue(node=node)
+}
+
+// Parse a JSON string
+pub fn parse: (input :&str) :JsonValue {
+    set node = c_json_parse(input)
+    return JsonValue(node=node)
+}
+
+// Stringify a JSON value
+pub fn stringify: (v :&JsonValue) :str {
+    return c_json_stringify(v.node)
+}

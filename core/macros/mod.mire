@@ -1,0 +1,5 @@
+module macros
+
+// Public namespace marker for Mire's built-in macro family. Macro declarations
+// are auto-scoped from owl.toml; this module makes `load mire::macros` a valid,
+// documented dependency boundary instead of requiring a private file path.

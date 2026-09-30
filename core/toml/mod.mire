@@ -1,0 +1,81 @@
+// TOML module for Mire
+// C parser with thin Mire API.
+module toml
+
+load kioto::strings
+
+// C FFI - parser
+extern fn c_toml_parse: (input :&str) :ptr lib "c"
+extern fn c_toml_free: (node :ptr) lib "c"
+extern fn c_toml_type: (node :ptr) :i64 lib "c"
+extern fn c_toml_str_val: (node :ptr) :str lib "c"
+extern fn c_toml_int_val: (node :ptr) :i64 lib "c"
+extern fn c_toml_float_val: (node :ptr) :f64 lib "c"
+extern fn c_toml_bool_val: (node :ptr) :i64 lib "c"
+extern fn c_toml_arr_len: (node :ptr) :i64 lib "c"
+extern fn c_toml_arr_get: (node :ptr, index :i64) :ptr lib "c"
+extern fn c_toml_tbl_len: (node :ptr) :i64 lib "c"
+extern fn c_toml_tbl_get: (node :ptr, key :&str) :ptr lib "c"
+extern fn c_toml_tbl_key: (node :ptr, index :i64) :str lib "c"
+
+// Type constants
+cons TAG_STRING = 0 :i64
+cons TAG_INT = 1 :i64
+cons TAG_FLOAT = 2 :i64
+cons TAG_BOOL = 3 :i64
+cons TAG_ARRAY = 4 :i64
+cons TAG_TABLE = 5 :i64
+cons TAG_NULL = 6 :i64
+
+// Value wrapper
+pub struct TomlValue {
+    node :ptr
+}
+
+// Parse a TOML string
+pub fn parse: (input :&str) :TomlValue {
+    return TomlValue(node=c_toml_parse(input))
+}
+
+// Free a TOML value
+pub fn free: (v :&TomlValue) {
+    c_toml_free(v.node)
+}
+
+// Type checks
+pub fn is_string: (v :&TomlValue) :bool { return c_toml_type(v.node) == TAG_STRING }
+pub fn is_int: (v :&TomlValue) :bool { return c_toml_type(v.node) == TAG_INT }
+pub fn is_float: (v :&TomlValue) :bool { return c_toml_type(v.node) == TAG_FLOAT }
+pub fn is_bool: (v :&TomlValue) :bool { return c_toml_type(v.node) == TAG_BOOL }
+pub fn is_array: (v :&TomlValue) :bool { return c_toml_type(v.node) == TAG_ARRAY }
+pub fn is_table: (v :&TomlValue) :bool { return c_toml_type(v.node) == TAG_TABLE }
+
+// Getters
+pub fn as_string: (v :&TomlValue) :str { return c_toml_str_val(v.node) }
+pub fn as_i64: (v :&TomlValue) :i64 { return c_toml_int_val(v.node) }
+pub fn as_f64: (v :&TomlValue) :f64 { return c_toml_float_val(v.node) }
+pub fn as_bool: (v :&TomlValue) :bool { return c_toml_bool_val(v.node) == 1 }
+
+// Table operations
+pub fn table_len: (v :&TomlValue) :i64 { return c_toml_tbl_len(v.node) }
+
+pub fn table_get: (v :&TomlValue, key :&str) :TomlValue {
+    set node = c_toml_tbl_get(v.node key)
+    if node == 0 {
+        return TomlValue(node=0)
+    }
+    return TomlValue(node=node)
+}
+
+pub fn table_key: (v :&TomlValue, index :i64) :str { return c_toml_tbl_key(v.node index) }
+
+// Array operations
+pub fn array_len: (v :&TomlValue) :i64 { return c_toml_arr_len(v.node) }
+
+pub fn array_get: (v :&TomlValue, index :i64) :TomlValue {
+    set node = c_toml_arr_get(v.node index)
+    if node == 0 {
+        return TomlValue(node=0)
+    }
+    return TomlValue(node=node)
+}

@@ -1,6 +1,6 @@
 [project]
 name = "mire"
-version = "0.0.7"
+version = "1.1.0"
 description = "Library for the Mire language"
 entry = "code/mod.mire"
 
@@ -8,35 +8,57 @@ entry = "code/mod.mire"
 compiler = "mire"
 profile = "debug"
 opt-level = 0
+artifact = "shared"
+runtime = "minimal"
+target = "x86_64-unknown-linux-gnu"
+panic = "abort"
+incremental = true
+debug-info = true
 
 [paths]
 sources = "."
 tests = "tests"
 output = "bin"
 cache = "bin/.cache"
+source = "."
+test = "tests"
+bin = "bin"
+generated = "bin/generated"
+
+[cfg]
+publisher = "publish.toml"
+registry = "mor"
 
 [exports]
 vec = "core/vec"
 map = "core/map"
 str = "core/str"
+std = "core/std"
 maybe = "core/maybe"
 result = "core/result"
 arr = "core/arr"
+json = "core/json"
+toml = "core/toml"
+# serde = "core/serde"    # Will add later
+macros = "core/macros"
 
-# Library macros — auto-scoped into every project that depends on mire (and
-# into mire's own builds). Each entry maps the bare macro name to a source
-# file declaring it with `@[macro!]`. No `load` is needed at call sites.
 [macros]
 assert = "core/macros/assert"
 dbg = "core/macros/dbg"
 panic = "core/macros/panic"
 unreachable = "core/macros/panic"
+assert_eq = "core/macros/checks"
+assert_ne = "core/macros/checks"
+trace_i64 = "core/macros/checks"
 
-# Strict security mode. All externs in mire's core are runtime helpers
-# (`rt_*`), declared with `lib "c"`; every macro mire ships is allowlisted so
-# `assert!`/`dbg!`/`panic!`/`unreachable!` remain available in strict projects.
 [security]
 mode = "strict"
-externs = ["rt_*"]
+externs = ["rt_*", "owl_archive_*"]
 extern_libs = ["c"]
-macros = ["assert", "dbg", "panic", "unreachable"]
+macros = ["assert", "dbg", "panic", "unreachable", "assert_eq", "assert_ne", "trace_i64"]
+
+[c]
+sources = ["code/c/json_parser.c"]
+libs = ["m"]
+["owl@lock"]
+version = "3"

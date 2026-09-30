@@ -1,14 +1,10 @@
-// `assert!(cond "message")` — aborts the process with `rt_panic_loc` when `cond`
-// is false, so failing assertions stop execution immediately (the panic hook
-// that bounds checks use).
+// Numeric assertion macros shipped by Mire.
+//
+// These are real Mire functions marked as macros: the compiler validates that
+// they are invoked with `!`, applies the macro security allowlist, and keeps
+// their body inside the normal type/borrow checking pipeline.
 
 extern fn rt_panic_loc: (msg :str line :i64 col :i64 file :str) lib "c"
-
-@[macro!] pub fn assert: (cond :bool msg :str) {
-    if !cond {
-        rt_panic_loc(msg 0 0 "")
-    }
-}
 
 @[macro!] pub fn assert_eq: (actual :i64 expected :i64 msg :str) {
     if actual != expected {

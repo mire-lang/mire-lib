@@ -1,2 +1,6 @@
 // Mire exports its modules individually through owl.toml. Consumers should
 // load the module they use, for example: load mire::vec.
+
+pub fn main: () :bool {
+    return true
+}

@@ -13,13 +13,14 @@ extern fn rt_vecs_last: (list :&vec[i64], line :i64, col :i64, file :str) :i64 l
 extern fn rt_vecs_remove: (list :&vec[i64], index :i64) lib "c"
 extern fn rt_vecs_clear: (list :&vec[i64]) lib "c"
 extern fn rt_vecs_sort: (list :&vec[i64]) lib "c"
-extern fn rt_vecs_reverse: (list :&vec[i64]) :vec[i64] lib "c"
-extern fn rt_vecs_unique: (list :&vec[i64]) :vec[i64] lib "c"
+extern fn rt_vecs_reverse: (list :&vec[i64]) lib "c"
+extern fn rt_vecs_unique: (list :&vec[i64]) lib "c"
 extern fn rt_vecs_contains_i64: (list :&vec[i64], value :i64) :bool lib "c"
 extern fn rt_vecs_index_of_i64: (list :&vec[i64], value :i64) :i64 lib "c"
 extern fn rt_vecs_slice: (list :&vec[i64], start :i64, end :i64) :vec[i64] lib "c"
 extern fn rt_vecs_flatten: (list :&vec[i64]) :vec[i64] lib "c"
 extern fn rt_vecs_concat: (list :&vec[i64], other :&vec[i64]) lib "c"
+extern fn rt_vecs_clone: (list :&vec[i64]) :vec[i64] lib "c"
 extern fn rt_strings_join_list: (list :&vec[str], sep :&str) :str lib "c"
 
 // ── len ─────────────────────────────────────────────────────────
@@ -90,6 +91,9 @@ pub fn flatten: (v :&vec[i64]) :vec[i64] { return rt_vecs_flatten(v) }
 
 // ── concat ──────────────────────────────────────────────────────
 pub fn concat: (v :&vec[i64], other :&vec[i64]) { rt_vecs_concat(v, other) }
+
+// ── clone ───────────────────────────────────────────────────────
+pub fn clone: (v :&vec[i64]) :vec[i64] { return rt_vecs_clone(v) }
 
 // ── join ────────────────────────────────────────────────────────
 pub fn join: (v :&vec[str], sep :&str) :str { return rt_strings_join_list(v, sep) }
