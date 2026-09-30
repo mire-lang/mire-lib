@@ -2,6 +2,61 @@
 
 All notable changes to the mire standard library.
 
+## [1.2.0] - 2026-09-30 (stdin module renamed to `in`, available() fixed)
+
+### Changed
+
+- **`mire::std::input` is now `mire::std::in`.** `in` is a keyword in the
+  language, and the module was named `input` only to dodge that collision, which
+  left the third standard stream reading as a category rather than a stream next
+  to `out` and `err`. Avenys v4.3.2 ([PR #33](https://github.com/mire-lang/Avenys-rust/pull/33))
+  accepts the `in` keyword as a module name, a load path segment and a call head,
+  so the collision is gone and the module can be named for what it is.
+
+  This is a breaking change to a public module, hence the minor bump. Nothing
+  outside this repository's own tests used `mire::std`, and the module is a day
+  old, so the cost is close to zero — but it is a rename, so it is not shipping
+  as a patch.
+
+  ```mire
+  load mire::std::in
+
+  pub fn main: () {
+      set line = in::line()
+      out::println(line)
+  }
+  ```
+
+### Fixed
+
+- **`in::available()` under-reported, so a program could block on a line that
+  had already been read.** The runtime checked the OS for input with `poll` and
+  never consulted its own buffer. Once `in::line()` had pulled a chunk off the
+  descriptor, the buffered remainder was invisible: `available()` reported
+  nothing, a reader that trusts it waits, and the bytes it is waiting for are
+  already in the process. Availability is now answered from the buffer first,
+  and the descriptor only when the buffer is empty. Reaching EOF also had to set
+  the flag, or `available()` stayed optimistic forever after the input ended.
+
+### Added
+
+- **22 integration cases** in `tests/std_io.sh`, and
+  `out::print_f64_no_newline` / `err::print_f64_no_newline` so a float can be
+  written without a trailing newline as an integer already could.
+
+### Removed
+
+- The `input` -> `in` workaround in the CHANGELOG's design notes, and with it the
+  claim that the flat aliases needed a local to build. They never did. The
+  one-line delegations compile as written; the note described a compiler bug
+  that was not reproducible, and the locals it recommended are gone.
+
+### Requirements
+
+- Avenys `v4.3.2` (PR #33) for `rt_io_*` and for the `in` keyword as a name.
+  The `dasu` flush fix in the same release is what makes a `dasu` and a stream
+  write to one destination interleave in call order.
+
 ## [1.1.0] - 2026-09-30 (standard streams)
 
 ### Added
@@ -100,11 +155,6 @@ All notable changes to the mire standard library.
 
 - Bumped library version to 1.0.0.
 - Updated `owl.toml` dependencies and macros sections.
-
-## [0.0.7] - 2026-08-05 (strict security mode)
-# Changelog
-
-All notable changes to the mire standard library.
 
 ## [0.0.7] - 2026-08-05 (strict security mode)
 

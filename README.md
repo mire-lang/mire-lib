@@ -1,4 +1,4 @@
-# mire v1.1.0
+# mire v1.2.0
 
 Standard library for the [Mire](https://github.com/mire-lang) programming language.
 
@@ -19,7 +19,7 @@ Standard library for the [Mire](https://github.com/mire-lang) programming langua
 ```toml
 # owl.toml
 [dependencies]
-    mire = "1.1.0"
+    mire = "1.2.0"
 ```
 
 ```mire
