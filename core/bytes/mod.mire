@@ -13,6 +13,13 @@
 // Converting to `str` (with `to_str`) copies out a managed string of exactly
 // `len` bytes, embedded NULs preserved. That is the bridge between the two
 // worlds: framing code stays in bytes, text handling stays in str.
+//
+// Buffer parameters are `:&ptr`, not `:ptr`, on purpose. Mire's ownership rules
+// MOVE an owned pointer on first use, so with `:ptr` every function here would
+// consume the buffer and the second call on the same buffer would be an
+// ownership error. A raw malloc'd buffer is never owned by the callee, so
+// borrowing is the accurate signature, and it lets a caller keep using one
+// buffer across many calls, which is the normal shape of framing code.
 module bytes
 
 load mire::str
@@ -34,6 +41,7 @@ extern fn rt_write_u16: (ptr :ptr, value :i64) lib "c"
 extern fn rt_write_u32: (ptr :ptr, value :i64) lib "c"
 extern fn rt_write_u64: (ptr :ptr, value :i64) lib "c"
 extern fn rt_managed_from_slice: (src :ptr, len :i64) :str lib "c"
+extern fn rt_managed_len: (value :&str) :i64 lib "c"
 
 // ── Allocation ──────────────────────────────────────────────────
 
@@ -46,7 +54,7 @@ pub fn alloc: (size :i64) :ptr {
     return rt_alloc_raw(size)
 }
 
-pub fn free: (buf :ptr) {
+pub fn free: (buf :&ptr) {
     rt_free_raw(buf)
 }
 
@@ -58,11 +66,11 @@ pub fn free: (buf :ptr) {
 // These take an index, not a pointer, so callers never spell out
 // `bytes::offset(buf i)` at the call site.
 
-pub fn get_u8: (buf :ptr, index :i64) :i64 {
+pub fn get_u8: (buf :&ptr, index :i64) :i64 {
     return rt_read_u8(rt_ptr_add(buf index))
 }
 
-pub fn set_u8: (buf :ptr, index :i64, value :i64) {
+pub fn set_u8: (buf :&ptr, index :i64, value :i64) {
     rt_write_u8(rt_ptr_add(buf index) value)
 }
 
@@ -71,28 +79,111 @@ pub fn set_u8: (buf :ptr, index :i64, value :i64) {
 // means a project never has to shift and mask by hand to assemble a length or a
 // type code, which is where sign bugs used to creep in.
 
-pub fn read_u16: (buf :ptr, index :i64) :i64 {
+pub fn read_u16: (buf :&ptr, index :i64) :i64 {
     return rt_read_u16(rt_ptr_add(buf index))
 }
 
-pub fn read_u32: (buf :ptr, index :i64) :i64 {
+pub fn read_u32: (buf :&ptr, index :i64) :i64 {
     return rt_read_u32(rt_ptr_add(buf index))
 }
 
-pub fn read_u64: (buf :ptr, index :i64) :i64 {
+pub fn read_u64: (buf :&ptr, index :i64) :i64 {
     return rt_read_u64(rt_ptr_add(buf index))
 }
 
-pub fn write_u16: (buf :ptr, index :i64, value :i64) {
+pub fn write_u16: (buf :&ptr, index :i64, value :i64) {
     rt_write_u16(rt_ptr_add(buf index) value)
 }
 
-pub fn write_u32: (buf :ptr, index :i64, value :i64) {
+pub fn write_u32: (buf :&ptr, index :i64, value :i64) {
     rt_write_u32(rt_ptr_add(buf index) value)
 }
 
-pub fn write_u64: (buf :ptr, index :i64, value :i64) {
+pub fn write_u64: (buf :&ptr, index :i64, value :i64) {
     rt_write_u64(rt_ptr_add(buf index) value)
+}
+
+// ── Big-endian access ───────────────────────────────────────────
+// Network byte order, MSB first. Needed by every wire protocol that specifies
+// big-endian lengths or fields: WebSocket frame lengths, most network headers,
+// and so on. The runtime's read_u16/write_u16 and friends are little-endian, so
+// these are assembled byte by byte rather than reversed after the fact, which
+// also keeps them correct regardless of host order.
+//
+// Offsets are precomputed into locals because a parenthesised expression cannot
+// be passed as an argument.
+
+pub fn write_u16_be: (buf :&ptr, index :i64, value :i64) {
+    set off0 = index + 0
+    set off1 = index + 1
+    set sh0 = (value >> 8) & 0xFF
+    set sh1 = (value >> 0) & 0xFF
+    rt_write_u8(rt_ptr_add(buf off0) sh0)
+    rt_write_u8(rt_ptr_add(buf off1) sh1)
+}
+
+pub fn write_u32_be: (buf :&ptr, index :i64, value :i64) {
+    set off0 = index + 0
+    set off1 = index + 1
+    set off2 = index + 2
+    set off3 = index + 3
+    set sh0 = (value >> 24) & 0xFF
+    set sh1 = (value >> 16) & 0xFF
+    set sh2 = (value >> 8) & 0xFF
+    set sh3 = (value >> 0) & 0xFF
+    rt_write_u8(rt_ptr_add(buf off0) sh0)
+    rt_write_u8(rt_ptr_add(buf off1) sh1)
+    rt_write_u8(rt_ptr_add(buf off2) sh2)
+    rt_write_u8(rt_ptr_add(buf off3) sh3)
+}
+
+pub fn write_u64_be: (buf :&ptr, index :i64, value :i64) {
+    set off0 = index + 0
+    set off1 = index + 1
+    set off2 = index + 2
+    set off3 = index + 3
+    set off4 = index + 4
+    set off5 = index + 5
+    set off6 = index + 6
+    set off7 = index + 7
+    set sh0 = (value >> 56) & 0xFF
+    set sh1 = (value >> 48) & 0xFF
+    set sh2 = (value >> 40) & 0xFF
+    set sh3 = (value >> 32) & 0xFF
+    set sh4 = (value >> 24) & 0xFF
+    set sh5 = (value >> 16) & 0xFF
+    set sh6 = (value >> 8) & 0xFF
+    set sh7 = (value >> 0) & 0xFF
+    rt_write_u8(rt_ptr_add(buf off0) sh0)
+    rt_write_u8(rt_ptr_add(buf off1) sh1)
+    rt_write_u8(rt_ptr_add(buf off2) sh2)
+    rt_write_u8(rt_ptr_add(buf off3) sh3)
+    rt_write_u8(rt_ptr_add(buf off4) sh4)
+    rt_write_u8(rt_ptr_add(buf off5) sh5)
+    rt_write_u8(rt_ptr_add(buf off6) sh6)
+    rt_write_u8(rt_ptr_add(buf off7) sh7)
+}
+
+pub fn read_u16_be: (buf :&ptr, index :i64) :i64 {
+    set hi_off = index
+    set lo_off = index + 1
+    set hi = rt_read_u8(rt_ptr_add(buf hi_off))
+    set lo = rt_read_u8(rt_ptr_add(buf lo_off))
+    set hi_sh = hi << 8
+    return hi_sh + lo
+}
+
+pub fn read_u64_be: (buf :&ptr, index :i64) :i64 {
+    set acc = 0 :i64 mut
+    set i = 0 :i64 mut
+    while i < 8 {
+        set off = index + i
+        set byte = rt_read_u8(rt_ptr_add(buf off))
+        set shifted = acc << 8
+        set acc = shifted + byte
+        set i = i + 1
+    }
+    return acc
 }
 
 // ── Conversion ──────────────────────────────────────────────────
@@ -100,8 +191,23 @@ pub fn write_u64: (buf :ptr, index :i64, value :i64) {
 // Copies `len` bytes out of the buffer into a managed string. The length is
 // explicit, so embedded NULs survive; do not use this on a string you expect to
 // be NUL-terminated.
-pub fn to_str: (buf :ptr, len :i64) :str {
+pub fn to_str: (buf :&ptr, len :i64) :str {
     return rt_managed_from_slice(buf len)
+}
+
+// One byte of a managed string, by index. Works on any byte including 0x00,
+// because it goes through the runtime rather than a strlen-based scan. Use this
+// rather than `strings::char_at`, which is documented as returning a codepoint
+// but actually returns the byte.
+pub fn get_str_u8: (src :&str, index :i64) :i64 {
+    return rt_read_u8(rt_ptr_add(src index))
+}
+
+// Byte length of a managed string, embedded NULs included. `strings::len` is not
+// necessarily this (see the stdlib's own caveats), and framing code that indexes
+// raw bytes must not be surprised by a short count.
+pub fn str_len: (src :&str) :i64 {
+    return rt_managed_len(src)
 }
 
 // ── Copying between buffers and strings ─────────────────────────
@@ -109,13 +215,20 @@ pub fn to_str: (buf :ptr, len :i64) :str {
 // performs: appending a fixed-size header, then appending a payload whose length
 // is already known.
 
-pub fn write_str_at: (buf :ptr, index :i64, src :&str, len :i64) {
+pub fn write_str_at: (buf :&ptr, index :i64, src :&str, len :i64) {
     // Copying a managed string's bytes one at a time. `at` reads a byte and
     // `set_at` writes one, so this works for any byte including 0x00; it is
     // O(len) with no hidden strlen anywhere.
     set i = 0 :i64 mut
     while i < len {
-        rt_write_u8(rt_ptr_add(buf (index + i)) rt_read_u8(rt_ptr_add(src i)))
+        // Both offsets are precomputed: a parenthesised expression as a function
+        // argument does not parse in Mire (`rt_ptr_add(buf (index + i))` is
+        // reported as "Unknown function 'buf'"), so the sum has to live in its
+        // own statement.
+        set dst_off = index + i
+        set dst_ptr = rt_ptr_add(buf dst_off)
+        set src_ptr = rt_ptr_add(src i)
+        rt_write_u8(dst_ptr rt_read_u8(src_ptr))
         set i = i + 1
     }
 }
@@ -129,7 +242,9 @@ pub fn read_str_at: (src :&str, index :i64, len :i64) :str {
     }
     set i = 0 :i64 mut
     while i < len {
-        rt_write_u8(rt_ptr_add(tmp i) rt_read_u8(rt_ptr_add(src (index + i))))
+        set src_off = index + i
+        set src_ptr = rt_ptr_add(src src_off)
+        rt_write_u8(rt_ptr_add(tmp i) rt_read_u8(src_ptr))
         set i = i + 1
     }
     set out = rt_managed_from_slice(tmp len)
