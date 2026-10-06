@@ -1,0 +1,109 @@
+// bytes module tests: allocation, single and multi-byte access, and the
+// string/buffer conversions that binary framing depends on.
+//
+//   cd mire && owl test
+
+load mire::str
+load mire::bytes
+
+@[test]
+pub fn alloc_and_null_check: () :bool {
+    set buf = bytes::alloc(16)
+    if buf == 0 {
+        return false
+    }
+    bytes::free(buf)
+    return true
+}
+
+@[test]
+pub fn alloc_zero_size_is_null: () :bool {
+    // A zero-sized allocation cannot be a usable buffer, and reporting it as
+    // null means the caller's `if buf == 0` guard covers it.
+    set buf = bytes::alloc(0)
+    return buf == 0
+}
+
+@[test]
+pub fn set_and_get_byte: () :bool {
+    set buf = bytes::alloc(4)
+    if buf == 0 {
+        return false
+    }
+    bytes::set_u8(buf 0 0x81)
+    bytes::set_u8(buf 3 0xFA)
+    // Byte 3 written without disturbing byte 0 is what proves the index is
+    // actually used as an offset.
+    set ok = bytes::get_u8(buf 0) == 0x81 && bytes::get_u8(buf 3) == 0xFA
+    bytes::free(buf)
+    return ok
+}
+
+@[test]
+pub fn multi_byte_is_little_endian: () :bool {
+    set buf = bytes::alloc(8)
+    if buf == 0 {
+        return false
+    }
+    bytes::write_u16(buf 0 0xBEEF)
+    set ok = bytes::get_u8(buf 0) == 0xEF && bytes::get_u8(buf 1) == 0xBE
+    bytes::free(buf)
+    return ok
+}
+
+@[test]
+pub fn buffer_to_str_keeps_embedded_nul: () :bool {
+    set buf = bytes::alloc(4)
+    if buf == 0 {
+        return false
+    }
+    bytes::set_u8(buf 0 0x41)
+    bytes::set_u8(buf 1 0x00)
+    bytes::set_u8(buf 2 0x42)
+    bytes::set_u8(buf 3 0x43)
+    set as_str = bytes::to_str(buf 4)
+    // Length 4, not 2: a strlen-based copy would have stopped at the NUL, which
+    // is the whole reason this goes through an explicit length.
+    set ok = strings::len(as_str) == 4
+    bytes::free(buf)
+    return ok
+}
+
+@[test]
+pub fn write_str_into_buffer_and_read_back: () :bool {
+    set buf = bytes::alloc(8)
+    if buf == 0 {
+        return false
+    }
+    set payload = "hello"
+    bytes::write_str_at(buf 2 payload 5)
+    set out = bytes::to_str(buf 7)
+    // 2 leading bytes, then the payload verbatim.
+    set ok = strings::len(out) == 7 && bytes::get_u8(buf 2) == 0x68 && bytes::get_u8(buf 6) == 0x6F
+    bytes::free(buf)
+    return ok
+}
+
+@[test]
+pub fn read_str_at_extracts_slice: () :bool {
+    set src = "headerBODY"
+    set body = bytes::read_str_at(src 6 4)
+    return body == "BODY"
+}
+
+@[test]
+pub fn read_str_at_handles_embedded_nul: () :bool {
+    // Binary payloads are not valid UTF-8; the copy must not stop at a NUL.
+    set buf = bytes::alloc(3)
+    if buf == 0 {
+        return false
+    }
+    bytes::set_u8(buf 0 0xFF)
+    bytes::set_u8(buf 1 0x00)
+    bytes::set_u8(buf 2 0x7F)
+    set bin = bytes::to_str(buf 3)
+    set slice = bytes::read_str_at(bin 1 2)
+    set ok = strings::len(bin) == 3 && strings::len(slice) == 2
+    bytes::free(buf)
+    return ok
+}

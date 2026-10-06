@@ -1,0 +1,138 @@
+// bytes — raw byte buffers and binary framing in pure Mire.
+//
+// A Mire `str` is UTF-8 text: it is counted in bytes but it is meant to be
+// read as text, and it cannot be built one byte at a time. Binary protocols
+// (WebSocket frames, image headers, .wasm modules, any varint or length-prefixed
+// format) need to treat a byte sequence as bytes, so until this module existed
+// every project had to hand-write a C bridge for it.
+//
+// A buffer here is a `:ptr` to plain malloc'd memory. It is NOT a managed
+// string: no refcount, no NUL terminator, no UTF-8 invariant. The caller owns
+// it and must `free` it, and can contain any byte value including 0x00.
+//
+// Converting to `str` (with `to_str`) copies out a managed string of exactly
+// `len` bytes, embedded NULs preserved. That is the bridge between the two
+// worlds: framing code stays in bytes, text handling stays in str.
+module bytes
+
+load mire::str
+
+// ── C runtime ───────────────────────────────────────────────────
+// Pointer arithmetic is a runtime call rather than `ptr + n` because the
+// compiler routes `+` on a ptr operand to string concatenation. Comparing a
+// buffer against 0 is a plain address comparison, so the usual null check
+// (`if buffer == 0`) works.
+extern fn rt_alloc_raw: (size :i64) :ptr lib "c"
+extern fn rt_free_raw: (ptr :ptr) lib "c"
+extern fn rt_ptr_add: (ptr :ptr, delta :i64) :ptr lib "c"
+extern fn rt_read_u8: (ptr :ptr) :i64 lib "c"
+extern fn rt_read_u16: (ptr :ptr) :i64 lib "c"
+extern fn rt_read_u32: (ptr :ptr) :i64 lib "c"
+extern fn rt_read_u64: (ptr :ptr) :i64 lib "c"
+extern fn rt_write_u8: (ptr :ptr, value :i64) lib "c"
+extern fn rt_write_u16: (ptr :ptr, value :i64) lib "c"
+extern fn rt_write_u32: (ptr :ptr, value :i64) lib "c"
+extern fn rt_write_u64: (ptr :ptr, value :i64) lib "c"
+extern fn rt_managed_from_slice: (src :ptr, len :i64) :str lib "c"
+
+// ── Allocation ──────────────────────────────────────────────────
+
+// Allocates a buffer of `size` bytes. The contents are NOT zeroed (plain
+// malloc), so initialise every byte you rely on.
+// Returns a null pointer when size <= 0 or the allocation fails, so check it:
+//     set buf = bytes::alloc(16)
+//     if buf == 0 { ... }
+pub fn alloc: (size :i64) :ptr {
+    return rt_alloc_raw(size)
+}
+
+pub fn free: (buf :ptr) {
+    rt_free_raw(buf)
+}
+
+// ── Single byte access ──────────────────────────────────────────
+// Named get_u8/set_u8 rather than at/set_at because `at` is a reserved word in
+// Mire (it introduces the `@[attr]` syntax and the `x at [i]` index form), so a
+// function called `at` does not even parse.
+//
+// These take an index, not a pointer, so callers never spell out
+// `bytes::offset(buf i)` at the call site.
+
+pub fn get_u8: (buf :ptr, index :i64) :i64 {
+    return rt_read_u8(rt_ptr_add(buf index))
+}
+
+pub fn set_u8: (buf :ptr, index :i64, value :i64) {
+    rt_write_u8(rt_ptr_add(buf index) value)
+}
+
+// ── Little-endian multi-byte access ─────────────────────────────
+// The runtime already reads and writes these little-endian; wrapping them here
+// means a project never has to shift and mask by hand to assemble a length or a
+// type code, which is where sign bugs used to creep in.
+
+pub fn read_u16: (buf :ptr, index :i64) :i64 {
+    return rt_read_u16(rt_ptr_add(buf index))
+}
+
+pub fn read_u32: (buf :ptr, index :i64) :i64 {
+    return rt_read_u32(rt_ptr_add(buf index))
+}
+
+pub fn read_u64: (buf :ptr, index :i64) :i64 {
+    return rt_read_u64(rt_ptr_add(buf index))
+}
+
+pub fn write_u16: (buf :ptr, index :i64, value :i64) {
+    rt_write_u16(rt_ptr_add(buf index) value)
+}
+
+pub fn write_u32: (buf :ptr, index :i64, value :i64) {
+    rt_write_u32(rt_ptr_add(buf index) value)
+}
+
+pub fn write_u64: (buf :ptr, index :i64, value :i64) {
+    rt_write_u64(rt_ptr_add(buf index) value)
+}
+
+// ── Conversion ──────────────────────────────────────────────────
+
+// Copies `len` bytes out of the buffer into a managed string. The length is
+// explicit, so embedded NULs survive; do not use this on a string you expect to
+// be NUL-terminated.
+pub fn to_str: (buf :ptr, len :i64) :str {
+    return rt_managed_from_slice(buf len)
+}
+
+// ── Copying between buffers and strings ─────────────────────────
+// These take an index because they are the operations framing code actually
+// performs: appending a fixed-size header, then appending a payload whose length
+// is already known.
+
+pub fn write_str_at: (buf :ptr, index :i64, src :&str, len :i64) {
+    // Copying a managed string's bytes one at a time. `at` reads a byte and
+    // `set_at` writes one, so this works for any byte including 0x00; it is
+    // O(len) with no hidden strlen anywhere.
+    set i = 0 :i64 mut
+    while i < len {
+        rt_write_u8(rt_ptr_add(buf (index + i)) rt_read_u8(rt_ptr_add(src i)))
+        set i = i + 1
+    }
+}
+
+// Reads `len` bytes starting at `index` out of a managed string. The caller
+// must already know those bytes exist.
+pub fn read_str_at: (src :&str, index :i64, len :i64) :str {
+    set tmp = rt_alloc_raw(len)
+    if tmp == 0 {
+        return ""
+    }
+    set i = 0 :i64 mut
+    while i < len {
+        rt_write_u8(rt_ptr_add(tmp i) rt_read_u8(rt_ptr_add(src (index + i))))
+        set i = i + 1
+    }
+    set out = rt_managed_from_slice(tmp len)
+    rt_free_raw(tmp)
+    return out
+}

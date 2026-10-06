@@ -29,6 +29,15 @@ generated = "bin/generated"
 publisher = "publish.toml"
 registry = "mor"
 
+[dependencies]
+# Self-dependency so that `owl test` resolves `mire::...` to THIS source tree
+# rather than to whatever copy is installed in ~/.owl/libs. Without it the test
+# suite silently links the installed 1.0.0 and fails with
+# "Package 'mire' has no export 'json'" for every module added since, which
+# looks like the tests are broken when they are not. Mirrors what the wasm
+# package does.
+mire = { path = "." }
+
 [exports]
 vec = "core/vec"
 map = "core/map"
@@ -37,6 +46,7 @@ std = "core/std"
 maybe = "core/maybe"
 result = "core/result"
 arr = "core/arr"
+bytes = "core/bytes"
 json = "core/json"
 toml = "core/toml"
 # serde = "core/serde"    # Will add later
