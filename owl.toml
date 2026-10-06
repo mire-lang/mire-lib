@@ -30,13 +30,21 @@ publisher = "publish.toml"
 registry = "mor"
 
 [dependencies]
-# Self-dependency so that `owl test` resolves `mire::...` to THIS source tree
-# rather than to whatever copy is installed in ~/.owl/libs. Without it the test
-# suite silently links the installed 1.0.0 and fails with
-# "Package 'mire' has no export 'json'" for every module added since, which
-# looks like the tests are broken when they are not. Mirrors what the wasm
-# package does.
-mire = { path = "." }
+# No self-dependency. A `mire = { path = "." }` was tried so `owl test` would
+# resolve `mire::...` to this source tree instead of the copy installed in
+# ~/.owl/libs (which is 1.0.0, while this is 1.2.0). Neither form works:
+#   - `path = "."` makes the compiler look for ./mire inside this project,
+#     which does not exist.
+#   - `path = ".."` points at the directory that does contain mire/, but the
+#     Avenys sandbox denies it: pal_sbx_permit rejects any absolute or
+#     traversing path outside the project root, so fs::exists("..") is false and
+#     the dependency is reported "path not found".
+#
+# Both are correct behaviour of the sandbox, not bugs to work around. Until the
+# compiler can be pointed at a source tree directly, this package's own test
+# suite must run against an installed copy (see tests/README). The comment
+# parser fix in owl (deps no longer read `#` lines as dependencies) is still
+# worth having and is independent of this.
 
 [exports]
 vec = "core/vec"
