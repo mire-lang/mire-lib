@@ -2,6 +2,7 @@ module vec
 
 // ── C runtime ───────────────────────────────────────────────────
 extern fn rt_vecs_len: (list :&anything) :i64 lib "c"
+extern fn rt_vecs_with_capacity_i64: (capacity :i64) :vec[i64] lib "c"
 extern fn rt_vecs_push_i64: (list :vec[i64], value :i64) :vec[i64] lib "c"
 extern fn rt_vecs_push_ptr: (list :vec[str], value :str) :vec[str] lib "c"
 extern fn rt_vecs_set_i64: (list :&vec[i64], index :i64, value :i64) lib "c"
@@ -25,6 +26,13 @@ extern fn rt_strings_join_list: (list :&vec[str], sep :&str) :str lib "c"
 
 // ── len ─────────────────────────────────────────────────────────
 pub fn len: (v :&anything) :i64 { return rt_vecs_len(v) }
+
+// ── with::capacity ──────────────────────────────────────────────
+pub fn with: () {
+    pub fn capacity: () {
+        pub fn i64: (capacity :i64) :vec[i64] { return rt_vecs_with_capacity_i64(capacity) }
+    }
+}
 
 // ── push ────────────────────────────────────────────────────────
 pub fn push: () {
