@@ -81,7 +81,7 @@ pub fn from: () {
 
 // ── to ──────────────────────────────────────────────────────────
 pub fn to: () {
-    pub fn i64: (s :&str) :i64 { return rt_string_to_i64(s) }
+    pub fn i64: (s :&str) :i64 { return rt_string_to_i64(copy(s)) }
 }
 
 // ── concat / copy ───────────────────────────────────────────────
