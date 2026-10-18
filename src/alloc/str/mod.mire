@@ -1,29 +1,34 @@
 module str
 
-// ── C runtime ───────────────────────────────────────────────────
-extern fn rt_strings_len: (s :&str) :i64 lib "c"
-extern fn rt_strings_to_upper: (s :&str) :str lib "c"
-extern fn rt_strings_to_lower: (s :&str) :str lib "c"
-extern fn rt_strings_trim: (s :&str) :str lib "c"
-extern fn rt_strings_strip: (s :&str) :str lib "c"
-extern fn rt_strings_contains: (s :&str, sub :&str) :bool lib "c"
-extern fn rt_strings_starts_with: (s :&str, prefix :&str) :bool lib "c"
-extern fn rt_strings_ends_with: (s :&str, suffix :&str) :bool lib "c"
-extern fn rt_strings_index_of: (s :&str, sub :&str) :i64 lib "c"
-extern fn rt_strings_replace: (s :&str, old :&str, new :&str) :str lib "c"
-extern fn rt_strings_replace_first: (s :&str, old :&str, new :&str) :str lib "c"
-extern fn rt_strings_split: (s :&str, sep :&str) :vec[str] lib "c"
-extern fn rt_strings_join_list: (parts :&vec[str], sep :&str) :str lib "c"
-extern fn rt_strings_substr: (s :&str, start :i64, len :i64) :str lib "c"
-extern fn rt_strings_repeat: (s :&str, n :i64) :str lib "c"
-extern fn rt_strings_pad_left: (s :&str, total_len :i64, pad :&str) :str lib "c"
-extern fn rt_strings_pad_right: (s :&str, total_len :i64, pad :&str) :str lib "c"
-extern fn rt_i64_to_string: (value :i64) :str lib "c"
-extern fn rt_string_to_i64: (s :&str) :i64 lib "c"
-extern fn rt_bool_to_string: (value :i64) :str lib "c"
-extern fn rt_f64_to_string: (value :f64) :str lib "c"
-extern fn rt_string_concat: (left :&str, right :&str) :str lib "c"
-extern fn rt_string_copy: (value :&str) :str lib "c"
+// String operations using PAL for memory management.
+// String operations are implemented in the Mire runtime C code and exposed
+// via PAL-compatible externs.
+// TODO: Move string operations to PAL C library for full C independence.
+
+// ── Runtime externs (via PAL) ────────────────────────────────────────────
+extern fn rt_strings_len: (s :&str) :i64 lib "pal"
+extern fn rt_strings_to_upper: (s :&str) :str lib "pal"
+extern fn rt_strings_to_lower: (s :&str) :str lib "pal"
+extern fn rt_strings_trim: (s :&str) :str lib "pal"
+extern fn rt_strings_strip: (s :&str) :str lib "pal"
+extern fn rt_strings_contains: (s :&str, sub :&str) :bool lib "pal"
+extern fn rt_strings_starts_with: (s :&str, prefix :&str) :bool lib "pal"
+extern fn rt_strings_ends_with: (s :&str, suffix :&str) :bool lib "pal"
+extern fn rt_strings_index_of: (s :&str, sub :&str) :i64 lib "pal"
+extern fn rt_strings_replace: (s :&str, old :&str, new :&str) :str lib "pal"
+extern fn rt_strings_replace_first: (s :&str, old :&str, new :&str) :str lib "pal"
+extern fn rt_strings_split: (s :&str, sep :&str) :vec[str] lib "pal"
+extern fn rt_strings_join_list: (parts :&vec[str], sep :&str) :str lib "pal"
+extern fn rt_strings_substr: (s :&str, start :i64, len :i64) :str lib "pal"
+extern fn rt_strings_repeat: (s :&str, n :i64) :str lib "pal"
+extern fn rt_strings_pad_left: (s :&str, total_len :i64, pad :&str) :str lib "pal"
+extern fn rt_strings_pad_right: (s :&str, total_len :i64, pad :&str) :str lib "pal"
+extern fn rt_i64_to_string: (value :i64) :str lib "pal"
+extern fn rt_string_to_i64: (s :&str) :i64 lib "pal"
+extern fn rt_bool_to_string: (value :i64) :str lib "pal"
+extern fn rt_f64_to_string: (value :f64) :str lib "pal"
+extern fn rt_string_concat: (left :&str, right :&str) :str lib "pal"
+extern fn rt_string_copy: (value :&str) :str lib "pal"
 
 // ── len ─────────────────────────────────────────────────────────
 pub fn len: (s :&str) :i64 { return rt_strings_len(s) }

@@ -13,13 +13,8 @@ module in
 // them has already buffered. That also means a read here and an ireru prompt see
 // the same stream position.
 
-// ── C runtime ─────────────────────────────────────────────────────────────
-extern fn rt_io_read_char: () :i64 lib "c"
-extern fn rt_io_read_line: () :str lib "c"
-extern fn rt_io_read_bytes: (count :i64) :str lib "c"
-extern fn rt_io_read_all: () :str lib "c"
-extern fn rt_io_available: () :i64 lib "c"
-extern fn rt_io_is_tty: () :i64 lib "c"
+// ── PAL I/O ─────────────────────────────────────────────────────────────────
+load mire::aux::pal
 
 // ── lines and bytes ────────────────────────────────────────────────────────
 
@@ -27,28 +22,28 @@ extern fn rt_io_is_tty: () :i64 lib "c"
 // loses its CR too, so input from any platform reads the same. Returns an empty
 // string at end of input, so an empty line and end of input are told apart with
 // available() or by attempting a second read.
-pub fn line: () :str { return rt_io_read_line() }
+pub fn line: () :str { return pal::io_read_line() }
 
 // Read one byte. Returns 0..255, or -1 at end of input. This is the only read
 // that reports EOF as a distinct value rather than as an empty string, so it is
 // the right choice for a binary protocol.
-pub fn byte: () :i64 { return rt_io_read_char() }
+pub fn byte: () :i64 { return pal::io_read_char() }
 
 // Read up to `count` bytes, or fewer if the input ends first. Use str::len on
 // the result to learn how many arrived. Embedded NULs are preserved.
-pub fn bytes: (count :i64) :str { return rt_io_read_bytes(count) }
+pub fn bytes: (count :i64) :str { return pal::io_read_bytes(count) }
 
 // Read stdin to end of input and return it as a managed string. Binary safe.
 // Returns an empty string when stdin is already at end of input.
-pub fn all: () :str { return rt_io_read_all() }
+pub fn all: () :str { return pal::io_read_all() }
 
 // ── readiness ──────────────────────────────────────────────────────────────
 
 // Bytes waiting on stdin without blocking, or 0 when nothing is ready. A prompt
 // that should not block uses this to decide between asking and moving on, and it
 // never consumes input, so a later read still sees everything.
-pub fn available: () :i64 { return rt_io_available() }
+pub fn available: () :i64 { return pal::io_available() }
 
 // True when stdin is an interactive terminal. Piped input is not, which is how a
 // program tells "a human is typing" from "another process is feeding me".
-pub fn is_tty: () :bool { return rt_io_is_tty() == 1 }
+pub fn is_tty: () :bool { return pal::io_is_tty() == 1 }

@@ -1,0 +1,51 @@
+// Mire Standard Library v2.0.0-beta
+// Reorganized stdlib: alloc/, std/, aux/
+//
+// This is the main entry point. It re-exports all public modules.
+
+// alloc/ - Memory management and data structures
+pub use mire::alloc::vec
+pub use mire::alloc::map
+pub use mire::alloc::str
+pub use mire::alloc::arr
+pub use mire::alloc::bytes
+pub use mire::alloc::maybe
+pub use mire::alloc::result
+
+// std/ - Platform operations via PAL
+pub use mire::std
+
+// aux/ - Auxiliary: macros, panic, test, startup, backtrace
+pub use mire::aux::macros
+
+// Re-export macros at top level for convenience
+pub use mire::aux::macros::assert
+pub use mire::aux::macros::dbg
+pub use mire::aux::macros::panic
+pub use mire::aux::macros::unreachable
+pub use mire::aux::macros::assert_eq
+pub use mire::aux::macros::assert_ne
+pub use mire::aux::macros::trace_i64
+
+// The prelude: commonly used items that can be glob-imported with `load mire::prelude`
+pub module prelude {
+    pub use mire::alloc::vec
+    pub use mire::alloc::map
+    pub use mire::alloc::str
+    pub use mire::alloc::arr
+    pub use mire::alloc::bytes
+    pub use mire::alloc::maybe
+    pub use mire::alloc::result
+    pub use mire::std
+    pub use mire::aux::macros::assert
+    pub use mire::aux::macros::dbg
+    pub use mire::aux::macros::panic
+    pub use mire::aux::macros::unreachable
+    pub use mire::aux::macros::assert_eq
+    pub use mire::aux::macros::assert_ne
+    pub use mire::aux::macros::trace_i64
+}
+
+fn main: () :bool {
+    return true
+}

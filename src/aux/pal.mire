@@ -1,0 +1,165 @@
+// PAL (Platform Abstraction Layer) bindings for Mire
+// Direct bindings to PAL C functions, replacing rt_* runtime calls.
+// This module provides the low-level PAL bindings that the stdlib uses
+// instead of calling into the C runtime (rt_* functions).
+
+module pal
+
+// ── I/O ────────────────────────────────────────────────────────────────────
+
+// Stream selectors (match C runtime expectations)
+pub const SEL_OUT: i64 = 1
+pub const SEL_ERR: i64 = 2
+pub const SEL_IN: i64 = 3
+
+// Write bytes to a stream. Returns bytes written, or -1 on error.
+extern fn io_write: (selector: i64, data: &str) :i64 lib "pal"
+
+// Write up to `count` bytes from `data`. Returns bytes written.
+extern fn io_write_n: (selector: i64, data: &str, count: i64) :i64 lib "pal"
+
+// Write a line (data + newline) atomically.
+extern fn io_write_line: (selector: i64, data: &str) :i64 lib "pal"
+
+// Write an integer, optionally followed by newline.
+extern fn io_write_i64: (selector: i64, value: i64, newline: i64) :i64 lib "pal"
+
+// Write a float, optionally followed by newline.
+extern fn io_write_f64: (selector: i64, value: f64, newline: i64) :i64 lib "pal"
+
+// Flush a stream. Returns 0 on success.
+extern fn io_flush: (selector: i64) :i64 lib "pal"
+
+// Check if stream is in error state. Returns 1 if error, 0 otherwise.
+extern fn io_error: (selector: i64) :i64 lib "pal"
+
+// Clear error and EOF indicators.
+extern fn io_clear: (selector: i64) :i64 lib "pal"
+
+// Get raw file descriptor for a stream.
+extern fn io_fd: (selector: i64) :i64 lib "pal"
+
+// Read one byte (or -1 at EOF).
+extern fn io_read_char: () :i64 lib "pal"
+
+// Read one line (without trailing newline).
+extern fn io_read_line: () :str lib "pal"
+
+// Read up to `count` bytes.
+extern fn io_read_bytes: (count: i64) :str lib "pal"
+
+// Read all remaining input.
+extern fn io_read_all: () :str lib "pal"
+
+// Bytes available for reading without blocking.
+extern fn io_available: () :i64 lib "pal"
+
+// Check if stdin is a TTY.
+extern fn io_is_tty: () :i64 lib "pal"
+
+// ── Time ───────────────────────────────────────────────────────────────────
+
+// Monotonic clock in nanoseconds.
+extern fn time_monotonic_ns: () :i64 lib "pal"
+
+// ── Memory ─────────────────────────────────────────────────────────────────
+
+// Allocate raw memory (bytes). Returns null on failure.
+extern fn memory_alloc: (size: i64) :ptr lib "pal"
+
+// Free raw memory allocated by memory_alloc.
+extern fn memory_free: (ptr: ptr) lib "pal"
+
+// Reallocate memory.
+extern fn memory_realloc: (ptr: ptr, new_size: i64) :ptr lib "pal"
+
+// Reserve virtual address space without committing physical pages.
+// Returns null on failure.
+extern fn memory_reserve: (size: i64) :ptr lib "pal"
+
+// Release reserved virtual address space.
+extern fn memory_release: (region: ptr, size: i64) :i64 lib "pal"
+
+// ── Process ────────────────────────────────────────────────────────────────
+
+// Execute a program. Returns 0 on success, -1 on failure.
+extern fn proc_exec: (path: &str, args: &str) :i64 lib "pal"
+
+// Spawn a child process. Returns PID on success, -1 on failure.
+extern fn proc_spawn: (path: &str, args: &str) :i64 lib "pal"
+
+// Wait for a process to exit. Returns exit code.
+extern fn proc_wait: (pid: i64) :i64 lib "pal"
+
+// ── Filesystem ─────────────────────────────────────────────────────────────
+
+// Open a file. Returns a handle (ptr) or null on failure.
+extern fn fs_open: (path: &str, flags: i64, mode: i64) :ptr lib "pal"
+
+// Read from a file handle.
+extern fn fs_read: (handle: ptr, buf: ptr, count: i64) :i64 lib "pal"
+
+// Write to a file handle.
+extern fn fs_write: (handle: ptr, data: ptr, count: i64) :i64 lib "pal"
+
+// Close a file handle.
+extern fn fs_close: (handle: ptr) :i64 lib "pal"
+
+// Get file size.
+extern fn fs_size: (handle: ptr) :i64 lib "pal"
+
+// Seek within a file.
+extern fn fs_seek: (handle: ptr, offset: i64, whence: i64) :i64 lib "pal"
+
+// Get current position.
+extern fn fs_tell: (handle: ptr) :i64 lib "pal"
+
+// ── Threads ────────────────────────────────────────────────────────────────
+
+// Create a new thread. Returns thread handle (ptr) or null.
+extern fn thread_spawn: (entry: ptr, arg: ptr) :ptr lib "pal"
+
+// Join a thread. Returns 0 on success.
+extern fn thread_join: (handle: ptr, ret_ptr: ptr) :i64 lib "pal"
+
+// ── Strings (managed) ──────────────────────────────────────────────────────
+
+// Allocate a managed string of given byte length.
+extern fn str_alloc: (len: i64) :str lib "pal"
+
+// Create a managed string from a C string.
+extern fn str_from_cstr: (cstr: ptr) :str lib "pal"
+
+// Get length of a managed string.
+extern fn str_len: (s: str) :i64 lib "pal"
+
+// Retain a managed string (increment refcount).
+extern fn str_retain: (s: str) lib "pal"
+
+// Release a managed string (decrement refcount, free if zero).
+extern fn str_release: (s: str) lib "pal"
+
+// Check if a pointer is a managed string.
+extern fn str_is_managed: (s: str) :i64 lib "pal"
+
+// ── Math ───────────────────────────────────────────────────────────────────
+
+// Absolute value for i64.
+extern fn math_abs_i64: (x: i64) :i64 lib "pal"
+
+// Absolute value for f64.
+extern fn math_abs_f64: (x: f64) :f64 lib "pal"
+
+// Square root for f64.
+extern fn math_sqrt_f64: (x: f64) :f64 lib "pal"
+
+// Power for f64.
+extern fn math_pow_f64: (x: f64, y: f64) :f64 lib "pal"
+
+// ── Process metrics ────────────────────────────────────────────────────────
+
+// Get process RSS in bytes.
+extern fn mem_process_rss: () :i64 lib "pal"
+
+// Get logical CPU count.
+extern fn cpu_count: () :i64 lib "pal"

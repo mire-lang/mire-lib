@@ -1,8 +1,8 @@
 [project]
 name = "mire"
-version = "1.3.0"
-description = "Library for the Mire language"
-entry = "code/mod.mire"
+version = "2.0.0-beta"
+description = "Library for the Mire language - stdlib reorganization (beta)"
+entry = "src/lib.mire"
 
 [build]
 compiler = "mire"
@@ -16,11 +16,11 @@ incremental = true
 debug-info = true
 
 [paths]
-sources = "."
+sources = "src"
 tests = "tests"
 output = "bin"
 cache = "bin/.cache"
-source = "."
+source = "src"
 test = "tests"
 bin = "bin"
 generated = "bin/generated"
@@ -30,44 +30,31 @@ publisher = "publish.toml"
 registry = "mor"
 
 [dependencies]
-# No self-dependency. A `mire = { path = "." }` was tried so `owl test` would
-# resolve `mire::...` to this source tree instead of the copy installed in
-# ~/.owl/libs (which is 1.0.0, while this is 1.2.0). Neither form works:
-#   - `path = "."` makes the compiler look for ./mire inside this project,
-#     which does not exist.
-#   - `path = ".."` points at the directory that does contain mire/, but the
-#     Avenys sandbox denies it: pal_sbx_permit rejects any absolute or
-#     traversing path outside the project root, so fs::exists("..") is false and
-#     the dependency is reported "path not found".
-#
-# Both are correct behaviour of the sandbox, not bugs to work around. Until the
-# compiler can be pointed at a source tree directly, this package's own test
-# suite must run against an installed copy (see tests/README). The comment
-# parser fix in owl (deps no longer read `#` lines as dependencies) is still
-# worth having and is independent of this.
 
 [exports]
-vec = "core/vec"
-map = "core/map"
-str = "core/str"
-std = "core/std"
-maybe = "core/maybe"
-result = "core/result"
-arr = "core/arr"
-bytes = "core/bytes"
-json = "core/json"
-toml = "core/toml"
-# serde = "core/serde"    # Will add later
-macros = "core/macros"
+# alloc/ - memory management, data structures
+vec = "src/alloc/vec"
+map = "src/alloc/map"
+str = "src/alloc/str"
+arr = "src/alloc/arr"
+bytes = "src/alloc/bytes"
+maybe = "src/alloc/maybe"
+result = "src/alloc/result"
+
+# std/ - platform operations via PAL
+std = "src/std"
+
+# aux/ - auxiliary macros, panic, test, startup, backtrace
+macros = "src/aux/macros"
 
 [macros]
-assert = "core/macros/assert"
-dbg = "core/macros/dbg"
-panic = "core/macros/panic"
-unreachable = "core/macros/panic"
-assert_eq = "core/macros/checks"
-assert_ne = "core/macros/checks"
-trace_i64 = "core/macros/checks"
+assert = "src/aux/macros/assert"
+dbg = "src/aux/macros/dbg"
+panic = "src/aux/macros/panic"
+unreachable = "src/aux/macros/panic"
+assert_eq = "src/aux/macros/checks"
+assert_ne = "src/aux/macros/checks"
+trace_i64 = "src/aux/macros/checks"
 
 [security]
 mode = "strict"
@@ -76,7 +63,7 @@ extern_libs = ["c"]
 macros = ["assert", "dbg", "panic", "unreachable", "assert_eq", "assert_ne", "trace_i64"]
 
 [c]
-sources = ["code/c/json_parser.c"]
+sources = ["code/c/json_parser.c", "code/c/toml_parser.c"]
 libs = ["m"]
 ["owl@lock"]
 version = "3"
