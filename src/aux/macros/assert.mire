@@ -1,24 +1,24 @@
-// `assert!(cond "message")` — aborts the process with `rt_panic_loc` when `cond`
+// `assert!(cond "message")` — aborts the process with `pal::assert_fail` when `cond`
 // is false, so failing assertions stop execution immediately (the panic hook
 // that bounds checks use).
 
-extern fn rt_panic_loc: (msg :str line :i64 col :i64 file :str) lib "c"
+load mire::aux::pal
 
 @[macro!] pub fn assert: (cond :bool msg :str) {
     if !cond {
-        rt_panic_loc(msg 0 0 "")
+        pal::assert_fail(msg)
     }
 }
 
 @[macro!] pub fn assert_eq: (actual :i64 expected :i64 msg :str) {
     if actual != expected {
-        rt_panic_loc(msg 0 0 "")
+        pal::assert_fail(msg)
     }
 }
 
 @[macro!] pub fn assert_ne: (actual :i64 unexpected :i64 msg :str) {
     if actual == unexpected {
-        rt_panic_loc(msg 0 0 "")
+        pal::assert_fail(msg)
     }
 }
 

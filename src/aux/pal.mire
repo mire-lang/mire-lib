@@ -157,9 +157,107 @@ extern fn math_sqrt_f64: (x: f64) :f64 lib "pal"
 extern fn math_pow_f64: (x: f64, y: f64) :f64 lib "pal"
 
 // ── Process metrics ────────────────────────────────────────────────────────
+ 
+ // Get process RSS in bytes.
+ extern fn mem_process_rss: () :i64 lib "pal"
+ 
+ // Get logical CPU count.
+ extern fn cpu_count: () :i64 lib "pal"
+ 
+ // ── Panic / Assert ─────────────────────────────────────────────────────────
+ 
+ // Abort the process with a message and source location.
+ extern fn panic_loc: (msg: str, line: i64, col: i64, file: str) lib "pal"
+ 
+ // Assertion failure with message.
+ extern fn assert_fail: (msg: str) lib "pal"
 
-// Get process RSS in bytes.
-extern fn mem_process_rss: () :i64 lib "pal"
+ // ── Bytes ──────────────────────────────────────────────────────────────────
 
-// Get logical CPU count.
-extern fn cpu_count: () :i64 lib "pal"
+ // Allocate raw memory (bytes). Returns null on failure.
+ extern fn bytes_alloc: (size: i64) :ptr lib "pal"
+
+ // Free raw memory allocated by bytes_alloc.
+ extern fn bytes_free: (ptr: ptr) lib "pal"
+
+ // Add delta to a pointer.
+ extern fn ptr_add: (ptr: ptr, delta: i64) :ptr lib "pal"
+
+ // Read u8/u16/u32/u64 from pointer.
+ extern fn read_u8: (ptr: ptr) :i64 lib "pal"
+ extern fn read_u16: (ptr: ptr) :i64 lib "pal"
+ extern fn read_u32: (ptr: ptr) :i64 lib "pal"
+ extern fn read_u64: (ptr: ptr) :i64 lib "pal"
+
+ // Write u8/u16/u32/u64 to pointer.
+ extern fn write_u8: (ptr: ptr, value: i64) lib "pal"
+ extern fn write_u16: (ptr: ptr, value: i64) lib "pal"
+ extern fn write_u32: (ptr: ptr, value: i64) lib "pal"
+ extern fn write_u64: (ptr: ptr, value: i64) lib "pal"
+
+ // Create managed string from slice.
+ extern fn managed_from_slice: (src: ptr, len: i64) :str lib "pal"
+
+ // Get length of managed string.
+ extern fn managed_len: (value: &str) :i64 lib "pal"
+
+ // ── Maps ───────────────────────────────────────────────────────────────────
+
+ // Get length of a map.
+ extern fn map_len: (dict: ptr) :i64 lib "pal"
+
+ // Check if map has a key.
+ extern fn map_has: (dict: ptr, key: &str) :bool lib "pal"
+
+ // Check if map is empty.
+ extern fn map_is_empty: (dict: ptr) :bool lib "pal"
+
+ // Get string value from map.
+ extern fn map_get_str: (dict: ptr, key: &str) :str lib "pal"
+
+ // Get i64 value from map.
+ extern fn map_get_i64: (dict: ptr, key: &str) :i64 lib "pal"
+
+ // Set string value in map.
+ extern fn map_set_str: (dict: ptr, key: &str, value: &str) :ptr lib "pal"
+
+ // Set i64 value in map.
+ extern fn map_set_i64: (dict: ptr, key: &str, value: i64) :ptr lib "pal"
+
+ // Remove a key from map.
+ extern fn map_remove: (dict: ptr, key: &str) lib "pal"
+
+ // Get all keys from map.
+ extern fn map_keys: (dict: ptr) :ptr lib "pal"
+
+ // Get all values from map.
+ extern fn map_values: (dict: ptr) :ptr lib "pal"
+
+ // Get all entries from map.
+ extern fn map_entries: (dict: ptr) :i64 lib "pal"
+
+ // Merge two maps.
+ extern fn map_merge: (dict: ptr, other: ptr) :ptr lib "pal"
+
+ // ── Arrays ──────────────────────────────────────────────────────────────────
+
+ // Get length of an array.
+ extern fn arr_len: (arr: ptr, count: i64) :i64 lib "pal"
+
+ // Get first element of an array.
+ extern fn arr_first_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
+
+ // Get last element of an array.
+ extern fn arr_last_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
+
+ // Check if array contains a value.
+ extern fn arr_contains_i64: (arr: ptr, count: i64, needle: i64) :bool lib "pal"
+
+ // Find index of a value in array.
+ extern fn arr_index_of_i64: (arr: ptr, count: i64, needle: i64) :i64 lib "pal"
+
+ // Reverse an array in place.
+ extern fn arr_reverse_i64: (arr: ptr, count: i64) lib "pal"
+
+ // Join array elements with separator.
+ extern fn arr_join: (arr: ptr, count: i64, sep: ptr) :ptr lib "pal"

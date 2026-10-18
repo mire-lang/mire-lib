@@ -20,28 +20,11 @@
 // ownership error. A raw malloc'd buffer is never owned by the callee, so
 // borrowing is the accurate signature, and it lets a caller keep using one
 // buffer across many calls, which is the normal shape of framing code.
+
 module bytes
 
 load mire::str
-
-// ── C runtime ───────────────────────────────────────────────────
-// Pointer arithmetic is a runtime call rather than `ptr + n` because the
-// compiler routes `+` on a ptr operand to string concatenation. Comparing a
-// buffer against 0 is a plain address comparison, so the usual null check
-// (`if buffer == 0`) works.
-extern fn rt_alloc_raw: (size :i64) :ptr lib "c"
-extern fn rt_free_raw: (ptr :ptr) lib "c"
-extern fn rt_ptr_add: (ptr :ptr, delta :i64) :ptr lib "c"
-extern fn rt_read_u8: (ptr :ptr) :i64 lib "c"
-extern fn rt_read_u16: (ptr :ptr) :i64 lib "c"
-extern fn rt_read_u32: (ptr :ptr) :i64 lib "c"
-extern fn rt_read_u64: (ptr :ptr) :i64 lib "c"
-extern fn rt_write_u8: (ptr :ptr, value :i64) lib "c"
-extern fn rt_write_u16: (ptr :ptr, value :i64) lib "c"
-extern fn rt_write_u32: (ptr :ptr, value :i64) lib "c"
-extern fn rt_write_u64: (ptr :ptr, value :i64) lib "c"
-extern fn rt_managed_from_slice: (src :ptr, len :i64) :str lib "c"
-extern fn rt_managed_len: (value :&str) :i64 lib "c"
+load mire::aux::pal
 
 // ── Allocation ──────────────────────────────────────────────────
 
@@ -51,11 +34,11 @@ extern fn rt_managed_len: (value :&str) :i64 lib "c"
 //     set buf = bytes::alloc(16)
 //     if buf == 0 { ... }
 pub fn alloc: (size :i64) :ptr {
-    return rt_alloc_raw(size)
+    return pal::bytes_alloc(size)
 }
 
 pub fn free: (buf :&ptr) {
-    rt_free_raw(buf)
+    pal::bytes_free(buf)
 }
 
 // ── Single byte access ──────────────────────────────────────────
@@ -67,11 +50,11 @@ pub fn free: (buf :&ptr) {
 // `bytes::offset(buf i)` at the call site.
 
 pub fn get_u8: (buf :&ptr, index :i64) :i64 {
-    return rt_read_u8(rt_ptr_add(buf index))
+    return pal::read_u8(pal::ptr_add(buf index))
 }
 
 pub fn set_u8: (buf :&ptr, index :i64, value :i64) {
-    rt_write_u8(rt_ptr_add(buf index) value)
+    pal::write_u8(pal::ptr_add(buf index) value)
 }
 
 // ── Little-endian multi-byte access ─────────────────────────────
@@ -80,27 +63,27 @@ pub fn set_u8: (buf :&ptr, index :i64, value :i64) {
 // type code, which is where sign bugs used to creep in.
 
 pub fn read_u16: (buf :&ptr, index :i64) :i64 {
-    return rt_read_u16(rt_ptr_add(buf index))
+    return pal::read_u16(pal::ptr_add(buf index))
 }
 
 pub fn read_u32: (buf :&ptr, index :i64) :i64 {
-    return rt_read_u32(rt_ptr_add(buf index))
+    return pal::read_u32(pal::ptr_add(buf index))
 }
 
 pub fn read_u64: (buf :&ptr, index :i64) :i64 {
-    return rt_read_u64(rt_ptr_add(buf index))
+    return pal::read_u64(pal::ptr_add(buf index))
 }
 
 pub fn write_u16: (buf :&ptr, index :i64, value :i64) {
-    rt_write_u16(rt_ptr_add(buf index) value)
+    pal::write_u16(pal::ptr_add(buf index) value)
 }
 
 pub fn write_u32: (buf :&ptr, index :i64, value :i64) {
-    rt_write_u32(rt_ptr_add(buf index) value)
+    pal::write_u32(pal::ptr_add(buf index) value)
 }
 
 pub fn write_u64: (buf :&ptr, index :i64, value :i64) {
-    rt_write_u64(rt_ptr_add(buf index) value)
+    pal::write_u64(pal::ptr_add(buf index) value)
 }
 
 // ── Big-endian access ───────────────────────────────────────────
@@ -118,8 +101,8 @@ pub fn write_u16_be: (buf :&ptr, index :i64, value :i64) {
     set off1 = index + 1
     set sh0 = (value >> 8) & 0xFF
     set sh1 = (value >> 0) & 0xFF
-    rt_write_u8(rt_ptr_add(buf off0) sh0)
-    rt_write_u8(rt_ptr_add(buf off1) sh1)
+    pal::write_u8(pal::ptr_add(buf off0) sh0)
+    pal::write_u8(pal::ptr_add(buf off1) sh1)
 }
 
 pub fn write_u32_be: (buf :&ptr, index :i64, value :i64) {
@@ -131,10 +114,10 @@ pub fn write_u32_be: (buf :&ptr, index :i64, value :i64) {
     set sh1 = (value >> 16) & 0xFF
     set sh2 = (value >> 8) & 0xFF
     set sh3 = (value >> 0) & 0xFF
-    rt_write_u8(rt_ptr_add(buf off0) sh0)
-    rt_write_u8(rt_ptr_add(buf off1) sh1)
-    rt_write_u8(rt_ptr_add(buf off2) sh2)
-    rt_write_u8(rt_ptr_add(buf off3) sh3)
+    pal::write_u8(pal::ptr_add(buf off0) sh0)
+    pal::write_u8(pal::ptr_add(buf off1) sh1)
+    pal::write_u8(pal::ptr_add(buf off2) sh2)
+    pal::write_u8(pal::ptr_add(buf off3) sh3)
 }
 
 pub fn write_u64_be: (buf :&ptr, index :i64, value :i64) {
@@ -154,21 +137,21 @@ pub fn write_u64_be: (buf :&ptr, index :i64, value :i64) {
     set sh5 = (value >> 16) & 0xFF
     set sh6 = (value >> 8) & 0xFF
     set sh7 = (value >> 0) & 0xFF
-    rt_write_u8(rt_ptr_add(buf off0) sh0)
-    rt_write_u8(rt_ptr_add(buf off1) sh1)
-    rt_write_u8(rt_ptr_add(buf off2) sh2)
-    rt_write_u8(rt_ptr_add(buf off3) sh3)
-    rt_write_u8(rt_ptr_add(buf off4) sh4)
-    rt_write_u8(rt_ptr_add(buf off5) sh5)
-    rt_write_u8(rt_ptr_add(buf off6) sh6)
-    rt_write_u8(rt_ptr_add(buf off7) sh7)
+    pal::write_u8(pal::ptr_add(buf off0) sh0)
+    pal::write_u8(pal::ptr_add(buf off1) sh1)
+    pal::write_u8(pal::ptr_add(buf off2) sh2)
+    pal::write_u8(pal::ptr_add(buf off3) sh3)
+    pal::write_u8(pal::ptr_add(buf off4) sh4)
+    pal::write_u8(pal::ptr_add(buf off5) sh5)
+    pal::write_u8(pal::ptr_add(buf off6) sh6)
+    pal::write_u8(pal::ptr_add(buf off7) sh7)
 }
 
 pub fn read_u16_be: (buf :&ptr, index :i64) :i64 {
     set hi_off = index
     set lo_off = index + 1
-    set hi = rt_read_u8(rt_ptr_add(buf hi_off))
-    set lo = rt_read_u8(rt_ptr_add(buf lo_off))
+    set hi = pal::read_u8(pal::ptr_add(buf hi_off))
+    set lo = pal::read_u8(pal::ptr_add(buf lo_off))
     set hi_sh = hi << 8
     return hi_sh + lo
 }
@@ -178,7 +161,7 @@ pub fn read_u64_be: (buf :&ptr, index :i64) :i64 {
     set i = 0 :i64 mut
     while i < 8 {
         set off = index + i
-        set byte = rt_read_u8(rt_ptr_add(buf off))
+        set byte = pal::read_u8(pal::ptr_add(buf off))
         set shifted = acc << 8
         set acc = shifted + byte
         set i = i + 1
@@ -192,7 +175,7 @@ pub fn read_u64_be: (buf :&ptr, index :i64) :i64 {
 // explicit, so embedded NULs survive; do not use this on a string you expect to
 // be NUL-terminated.
 pub fn to_str: (buf :&ptr, len :i64) :str {
-    return rt_managed_from_slice(buf len)
+    return pal::managed_from_slice(buf len)
 }
 
 // One byte of a managed string, by index. Works on any byte including 0x00,
@@ -200,14 +183,14 @@ pub fn to_str: (buf :&ptr, len :i64) :str {
 // rather than `strings::char_at`, which is documented as returning a codepoint
 // but actually returns the byte.
 pub fn get_str_u8: (src :&str, index :i64) :i64 {
-    return rt_read_u8(rt_ptr_add(src index))
+    return pal::read_u8(pal::ptr_add(src index))
 }
 
 // Byte length of a managed string, embedded NULs included. `strings::len` is not
 // necessarily this (see the stdlib's own caveats), and framing code that indexes
 // raw bytes must not be surprised by a short count.
 pub fn str_len: (src :&str) :i64 {
-    return rt_managed_len(src)
+    return pal::managed_len(src)
 }
 
 // ── Copying between buffers and strings ─────────────────────────
@@ -226,9 +209,9 @@ pub fn write_str_at: (buf :&ptr, index :i64, src :&str, len :i64) {
         // reported as "Unknown function 'buf'"), so the sum has to live in its
         // own statement.
         set dst_off = index + i
-        set dst_ptr = rt_ptr_add(buf dst_off)
-        set src_ptr = rt_ptr_add(src i)
-        rt_write_u8(dst_ptr rt_read_u8(src_ptr))
+        set dst_ptr = pal::ptr_add(buf dst_off)
+        set src_ptr = pal::ptr_add(src i)
+        pal::write_u8(dst_ptr pal::read_u8(src_ptr))
         set i = i + 1
     }
 }
@@ -236,18 +219,18 @@ pub fn write_str_at: (buf :&ptr, index :i64, src :&str, len :i64) {
 // Reads `len` bytes starting at `index` out of a managed string. The caller
 // must already know those bytes exist.
 pub fn read_str_at: (src :&str, index :i64, len :i64) :str {
-    set tmp = rt_alloc_raw(len)
+    set tmp = pal::bytes_alloc(len)
     if tmp == 0 {
         return ""
     }
     set i = 0 :i64 mut
     while i < len {
         set src_off = index + i
-        set src_ptr = rt_ptr_add(src src_off)
-        rt_write_u8(rt_ptr_add(tmp i) rt_read_u8(src_ptr))
+        set src_ptr = pal::ptr_add(src src_off)
+        pal::write_u8(pal::ptr_add(tmp i) pal::read_u8(src_ptr))
         set i = i + 1
     }
-    set out = rt_managed_from_slice(tmp len)
-    rt_free_raw(tmp)
+    set out = pal::managed_from_slice(tmp len)
+    pal::bytes_free(tmp)
     return out
 }

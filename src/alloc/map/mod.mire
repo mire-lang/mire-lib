@@ -1,64 +1,44 @@
 module map
 
-// ── C runtime ───────────────────────────────────────────────────
-// Note: set/merge return the map because the runtime may reallocate
-// the backing storage (same contract as `vec::push`). Read-only
-// functions take `&anything` so passing a map does not move it.
-// Keys and str values are declared `&str` because the runtime
-// internally copies them (rt_strdup_raw) — the map never takes
-// ownership of caller strings, so they are borrowed, not moved.
-extern fn rt_maps_len: (dict :&anything) :i64 lib "c"
-extern fn rt_maps_has: (dict :&anything, key :&str) :bool lib "c"
-extern fn rt_maps_is_empty: (dict :&anything) :bool lib "c"
-extern fn rt_maps_get: (dict :&anything, key :&str) :str lib "c"
-extern fn rt_maps_get_i64: (dict :&anything, key :&str) :i64 lib "c"
-extern fn rt_maps_set: (dict :map[str str], key :&str, value :&str) :map[str str] lib "c"
-extern fn rt_maps_set_i64: (dict :map[str i64], key :&str, value :i64) :map[str i64] lib "c"
-extern fn rt_maps_remove: (dict :&anything, key :&str) lib "c"
-extern fn rt_maps_keys: (dict :&anything) :vec[str] lib "c"
-extern fn rt_maps_values: (dict :&anything) :vec[i64] lib "c"
-extern fn rt_maps_entries: (dict :&anything) :i64 lib "c"
-extern fn rt_maps_merge: (dict, other) :map[str anything] lib "c"
+// ── PAL map operations ─────────────────────────────────────────────────────
+load mire::aux::pal
 
 // ── len ─────────────────────────────────────────────────────────
-pub fn len: (m :&anything) :i64 { return rt_maps_len(m) }
+pub fn len: (m :&anything) :i64 { return pal::map_len(m) }
 
 // ── has ─────────────────────────────────────────────────────────
-pub fn has: (m :&anything, key :&str) :bool { return rt_maps_has(m, key) }
+pub fn has: (m :&anything, key :&str) :bool { return pal::map_has(m, key) }
 
 // ── is ──────────────────────────────────────────────────────────
 pub fn is: () {
-    pub fn empty: (m :&anything) :bool { return rt_maps_is_empty(m) }
+    pub fn empty: (m :&anything) :bool { return pal::map_is_empty(m) }
 }
 
 // ── get ─────────────────────────────────────────────────────────
 pub fn get: () {
-    pub fn str: (m :&anything, key :&str) :str { return rt_maps_get(m, key) }
-    pub fn i64: (m :&anything, key :&str) :i64 { return rt_maps_get_i64(m, key) }
+    pub fn str: (m :&anything, key :&str) :str { return pal::map_get_str(m, key) }
+    pub fn i64: (m :&anything, key :&str) :i64 { return pal::map_get_i64(m, key) }
 }
 
 // ── set ─────────────────────────────────────────────────────────
 pub fn set: () {
-    pub fn str: (m :map[str str], key :&str, value :&str) :map[str str] { return rt_maps_set(m, key, value) }
-    pub fn i64: (m :map[str i64], key :&str, value :i64) :map[str i64] { return rt_maps_set_i64(m, key, value) }
+    pub fn str: (m :ptr, key :&str, value :&str) :ptr { return pal::map_set_str(m, key, value) }
+    pub fn i64: (m :ptr, key :&str, value :i64) :ptr { return pal::map_set_i64(m, key, value) }
 }
 
 // ── remove ──────────────────────────────────────────────────────
-pub fn remove: (m :&anything, key :&str) { rt_maps_remove(m, key) }
+pub fn remove: (m :ptr, key :&str) { pal::map_remove(m, key) }
 
 // ── keys ────────────────────────────────────────────────────────
-pub fn keys: (m :&anything) :vec[str] { return rt_maps_keys(m) }
+pub fn keys: (m :ptr) :ptr { return pal::map_keys(m) }
 
 // ── values ──────────────────────────────────────────────────────
 pub fn values: () {
-    pub fn i64: (m :&anything) :vec[i64] { return rt_maps_values(m) }
+    pub fn i64: (m :ptr) :ptr { return pal::map_values(m) }
 }
 
 // ── entries ─────────────────────────────────────────────────────
-pub fn entries: (m :&anything) :i64 { return rt_maps_entries(m) }
-
-// ── count ───────────────────────────────────────────────────────
-pub fn count: (m :&anything) :i64 { return rt_maps_entries(m) }
+pub fn entries: (m :ptr) :i64 { return pal::map_entries(m) }
 
 // ── merge ───────────────────────────────────────────────────────
-pub fn merge: (m, other) :map[str anything] { return rt_maps_merge(m, other) }
+pub fn merge: (m :ptr, other :ptr) :ptr { return pal::map_merge(m, other) }

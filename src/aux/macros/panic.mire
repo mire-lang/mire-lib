@@ -1,16 +1,16 @@
 // Panic primitives, exposed as macros so they share the `name!(...)` call
 // convention with the rest of the macro surface.
 //
-// `rt_panic_loc` is a runtime extern (see runtime.h) that prints the message
+// `pal::panic_loc` is a PAL extern that prints the message
 // with source location and aborts the process — the same hook used by bounds
 // checks, so a panic from `panic!`/`unreachable!` produces an identical abort.
 
-extern fn rt_panic_loc: (msg :str line :i64 col :i64 file :str) lib "c"
+load mire::aux::pal
 
 @[macro!] pub fn panic: (msg :str) {
-    rt_panic_loc(msg 0 0 "")
+    pal::panic_loc(msg 0 0 "")
 }
 
 @[macro!] pub fn unreachable: (msg :str) {
-    rt_panic_loc(msg 0 0 "")
+    pal::panic_loc(msg 0 0 "")
 }
