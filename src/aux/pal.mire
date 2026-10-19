@@ -368,5 +368,18 @@ extern fn math_pow_f64: (x: f64, y: f64) :f64 lib "pal"
  // Unwrap Or: get value or default for pointer.
  extern fn maybe_unwrap_or_ptr: (ptr: ptr, default_val: ptr) :ptr lib "pal"
  
- // Free a Maybe.
- extern fn maybe_free: (ptr: ptr) lib "pal"
+// Free a Maybe.
+extern fn maybe_free: (ptr: ptr) lib "pal"
+
+// ── Bump allocator free list ──────────────────────────────────────────────
+// Find a free block of at least the given size. Returns size class index or -1.
+extern fn bump_free_list_find: (size: i64) :i64 lib "pal"
+
+// Pop a block from the free list. Returns the block pointer or null.
+extern fn bump_free_list_pop: (size_class: i64) :ptr lib "pal"
+
+/// Push a block back to the free list.
+extern fn bump_free_list_push: (ptr: ptr, size_class: i64) lib "pal"
+
+/// Initialize the bump allocator free list (called at startup).
+extern fn bump_free_list_init: () lib "pal"
