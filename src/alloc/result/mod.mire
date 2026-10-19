@@ -1,61 +1,43 @@
 module result
 
-// ── C runtime ───────────────────────────────────────────────────
-extern fn rt_result_ok_i64: (value :i64) :ptr lib "c"
-extern fn rt_result_ok_str: (value :str) :ptr lib "c"
-extern fn rt_result_ok_ptr: (value :ptr) :ptr lib "c"
-extern fn rt_result_err_i64: (error :i64) :ptr lib "c"
-extern fn rt_result_err_str: (error :str) :ptr lib "c"
-extern fn rt_result_err_ptr: (error :ptr) :ptr lib "c"
-extern fn rt_result_is_ok: (ptr :ptr) :bool lib "c"
-extern fn rt_result_is_err: (ptr :ptr) :bool lib "c"
-extern fn rt_result_err_payload: (ptr :ptr) :ptr lib "c"
-extern fn rt_result_unwrap_i64: (ptr :ptr, line :i64, col :i64, file :ptr) :i64 lib "c"
-extern fn rt_result_unwrap_str: (ptr :ptr, line :i64, col :i64, file :ptr) :ptr lib "c"
-extern fn rt_result_unwrap_f64: (ptr :ptr, line :i64, col :i64, file :ptr) :f64 lib "c"
-extern fn rt_result_unwrap_ptr: (ptr :ptr, line :i64, col :i64, file :ptr) :ptr lib "c"
-extern fn rt_result_unwrap_err_str: (ptr :ptr, line :i64, col :i64, file :ptr) :ptr lib "c"
-extern fn rt_result_unwrap_or_i64: (ptr :ptr, default_val :i64) :i64 lib "c"
-extern fn rt_result_unwrap_or_str: (ptr :ptr, default_val :ptr) :ptr lib "c"
-extern fn rt_result_unwrap_or_f64: (ptr :ptr, default_val :f64) :f64 lib "c"
-extern fn rt_result_unwrap_or_ptr: (ptr :ptr, default_val :ptr) :ptr lib "c"
-extern fn rt_result_free: (ptr :ptr) lib "c"
+// ── PAL Result operations ────────────────────────────────────────────────────
+load mire::aux::pal
 
 // ── ok ──────────────────────────────────────────────────────────
 pub fn ok: () {
-    pub fn i64: (value :i64) :ptr { return rt_result_ok_i64(value) }
-    pub fn str: (value :str) :ptr { return rt_result_ok_str(value) }
-    pub fn ptr: (value :ptr) :ptr { return rt_result_ok_ptr(value) }
+    pub fn i64: (value :i64) :ptr { return pal::result_ok_i64(value) }
+    pub fn str: (value :str) :ptr { return pal::result_ok_str(value) }
+    pub fn ptr: (value :ptr) :ptr { return pal::result_ok_ptr(value) }
 }
 
 // ── err ─────────────────────────────────────────────────────────
 pub fn err: () {
-    pub fn i64: (error :i64) :ptr { return rt_result_err_i64(error) }
-    pub fn str: (error :str) :ptr { return rt_result_err_str(error) }
-    pub fn ptr: (error :ptr) :ptr { return rt_result_err_ptr(error) }
-    pub fn payload: (ptr :ptr) :ptr { return rt_result_err_payload(ptr) }
+    pub fn i64: (error :i64) :ptr { return pal::result_err_i64(error) }
+    pub fn str: (error :str) :ptr { return pal::result_err_str(error) }
+    pub fn ptr: (error :ptr) :ptr { return pal::result_err_ptr(error) }
+    pub fn payload: (ptr :ptr) :ptr { return pal::result_err_payload(ptr) }
 }
 
 // ── is ──────────────────────────────────────────────────────────
 pub fn is: () {
-    pub fn ok: (ptr :ptr) :bool { return rt_result_is_ok(ptr) }
-    pub fn err: (ptr :ptr) :bool { return rt_result_is_err(ptr) }
+    pub fn ok: (ptr :ptr) :bool { return pal::result_is_ok(ptr) }
+    pub fn err: (ptr :ptr) :bool { return pal::result_is_err(ptr) }
 }
 
 // ── unwrap ──────────────────────────────────────────────────────
 pub fn unwrap: () {
-    pub fn i64: (ptr :ptr) :i64 { return rt_result_unwrap_i64(ptr, 0, 0, "") }
-    pub fn str: (ptr :ptr) :ptr { return rt_result_unwrap_str(ptr, 0, 0, "") }
-    pub fn f64: (ptr :ptr) :f64 { return rt_result_unwrap_f64(ptr, 0, 0, "") }
-    pub fn ptr: (ptr :ptr) :ptr { return rt_result_unwrap_ptr(ptr, 0, 0, "") }
-    pub fn err::str: (ptr :ptr) :ptr { return rt_result_unwrap_err_str(ptr, 0, 0, "") }
+    pub fn i64: (ptr :ptr) :i64 { return pal::result_unwrap_i64(ptr, 0, 0, "") }
+    pub fn str: (ptr :ptr) :ptr { return pal::result_unwrap_str(ptr, 0, 0, "") }
+    pub fn f64: (ptr :ptr) :f64 { return pal::result_unwrap_f64(ptr, 0, 0, "") }
+    pub fn ptr: (ptr :ptr) :ptr { return pal::result_unwrap_ptr(ptr, 0, 0, "") }
+    pub fn err::str: (ptr :ptr) :ptr { return pal::result_unwrap_err_str(ptr, 0, 0, "") }
 }
 
 // ── unwrap::*::or (3-level, stays flat) ─────────────────────────
-pub fn unwrap::i64::or: (ptr :ptr, default_val :i64) :i64 { return rt_result_unwrap_or_i64(ptr, default_val) }
-pub fn unwrap::str::or: (ptr :ptr, default_val :ptr) :ptr { return rt_result_unwrap_or_str(ptr, default_val) }
-pub fn unwrap::f64::or: (ptr :ptr, default_val :f64) :f64 { return rt_result_unwrap_or_f64(ptr, default_val) }
-pub fn unwrap::ptr::or: (ptr :ptr, default_val :ptr) :ptr { return rt_result_unwrap_or_ptr(ptr, default_val) }
+pub fn unwrap::i64::or: (ptr :ptr, default_val :i64) :i64 { return pal::result_unwrap_or_i64(ptr, default_val) }
+pub fn unwrap::str::or: (ptr :ptr, default_val :ptr) :ptr { return pal::result_unwrap_or_str(ptr, default_val) }
+pub fn unwrap::f64::or: (ptr :ptr, default_val :f64) :f64 { return pal::result_unwrap_or_f64(ptr, default_val) }
+pub fn unwrap::ptr::or: (ptr :ptr, default_val :ptr) :ptr { return pal::result_unwrap_or_ptr(ptr, default_val) }
 
 // ── free ────────────────────────────────────────────────────────
-pub fn free: (ptr :ptr) { rt_result_free(ptr) }
+pub fn free: (ptr :ptr) { pal::result_free(ptr) }

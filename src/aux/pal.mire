@@ -201,63 +201,172 @@ extern fn math_pow_f64: (x: f64, y: f64) :f64 lib "pal"
  // Get length of managed string.
  extern fn managed_len: (value: &str) :i64 lib "pal"
 
- // ── Maps ───────────────────────────────────────────────────────────────────
-
+// ── Maps ───────────────────────────────────────────────────────────────────
+ 
  // Get length of a map.
  extern fn map_len: (dict: ptr) :i64 lib "pal"
-
+ 
  // Check if map has a key.
  extern fn map_has: (dict: ptr, key: &str) :bool lib "pal"
-
+ 
  // Check if map is empty.
  extern fn map_is_empty: (dict: ptr) :bool lib "pal"
-
+ 
  // Get string value from map.
  extern fn map_get_str: (dict: ptr, key: &str) :str lib "pal"
-
+ 
  // Get i64 value from map.
  extern fn map_get_i64: (dict: ptr, key: &str) :i64 lib "pal"
-
+ 
  // Set string value in map.
  extern fn map_set_str: (dict: ptr, key: &str, value: &str) :ptr lib "pal"
-
+ 
  // Set i64 value in map.
  extern fn map_set_i64: (dict: ptr, key: &str, value: i64) :ptr lib "pal"
-
+ 
  // Remove a key from map.
  extern fn map_remove: (dict: ptr, key: &str) lib "pal"
-
+ 
  // Get all keys from map.
  extern fn map_keys: (dict: ptr) :ptr lib "pal"
-
+ 
  // Get all values from map.
  extern fn map_values: (dict: ptr) :ptr lib "pal"
-
+ 
  // Get all entries from map.
  extern fn map_entries: (dict: ptr) :i64 lib "pal"
-
+ 
  // Merge two maps.
  extern fn map_merge: (dict: ptr, other: ptr) :ptr lib "pal"
-
+ 
  // ── Arrays ──────────────────────────────────────────────────────────────────
-
+ 
  // Get length of an array.
  extern fn arr_len: (arr: ptr, count: i64) :i64 lib "pal"
-
+ 
  // Get first element of an array.
  extern fn arr_first_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
-
+ 
  // Get last element of an array.
  extern fn arr_last_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
-
+ 
  // Check if array contains a value.
  extern fn arr_contains_i64: (arr: ptr, count: i64, needle: i64) :bool lib "pal"
-
+ 
  // Find index of a value in array.
  extern fn arr_index_of_i64: (arr: ptr, count: i64, needle: i64) :i64 lib "pal"
-
+ 
  // Reverse an array in place.
  extern fn arr_reverse_i64: (arr: ptr, count: i64) lib "pal"
-
+ 
  // Join array elements with separator.
  extern fn arr_join: (arr: ptr, count: i64, sep: ptr) :ptr lib "pal"
+ 
+ // ── Result ───────────────────────────────────────────────────────────────────
+ 
+ // Create Ok result with i64 value.
+ extern fn result_ok_i64: (value: i64) :ptr lib "pal"
+ 
+ // Create Ok result with string value.
+ extern fn result_ok_str: (value: str) :ptr lib "pal"
+ 
+ // Create Ok result with pointer value.
+ extern fn result_ok_ptr: (value: ptr) :ptr lib "pal"
+ 
+ // Create Err result with i64 error.
+ extern fn result_err_i64: (error: i64) :ptr lib "pal"
+ 
+ // Create Err result with string error.
+ extern fn result_err_str: (error: str) :ptr lib "pal"
+ 
+ // Create Err result with pointer error.
+ extern fn result_err_ptr: (error: ptr) :ptr lib "pal"
+ 
+ // Check if result is Ok.
+ extern fn result_is_ok: (ptr: ptr) :bool lib "pal"
+ 
+ // Check if result is Err.
+ extern fn result_is_err: (ptr: ptr) :bool lib "pal"
+ 
+ // Get error payload from Err result.
+ extern fn result_err_payload: (ptr: ptr) :ptr lib "pal"
+ 
+ // Unwrap i64 from Ok result (panics on Err).
+ extern fn result_unwrap_i64: (ptr: ptr, line: i64, col: i64, file: str) :i64 lib "pal"
+ 
+ // Unwrap string from Ok result (panics on Err).
+ extern fn result_unwrap_str: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+ 
+ // Unwrap f64 from Ok result (panics on Err).
+ extern fn result_unwrap_f64: (ptr: ptr, line: i64, col: i64, file: str) :f64 lib "pal"
+ 
+ // Unwrap pointer from Ok result (panics on Err).
+ extern fn result_unwrap_ptr: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+ 
+ // Unwrap error string from Err result (panics on Ok).
+ extern fn result_unwrap_err_str: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+ 
+ // Unwrap Or: get value or default for i64.
+ extern fn result_unwrap_or_i64: (ptr: ptr, default_val: i64) :i64 lib "pal"
+ 
+ // Unwrap Or: get value or default for string.
+ extern fn result_unwrap_or_str: (ptr: ptr, default_val: ptr) :ptr lib "pal"
+ 
+ // Unwrap Or: get value or default for f64.
+ extern fn result_unwrap_or_f64: (ptr: ptr, default_val: f64) :f64 lib "pal"
+ 
+ // Unwrap Or: get value or default for pointer.
+ extern fn result_unwrap_or_ptr: (ptr: ptr, default_val: ptr) :ptr lib "pal"
+ 
+ // Free a result.
+ extern fn result_free: (ptr: ptr) lib "pal"
+ 
+ // ── Maybe ───────────────────────────────────────────────────────────────────
+ 
+ // Create Some with i64 value.
+ extern fn maybe_some_i64: (value: i64) :ptr lib "pal"
+ 
+ // Create Some with string value.
+ extern fn maybe_some_str: (value: str) :ptr lib "pal"
+ 
+ // Create Some with f64 value.
+ extern fn maybe_some_f64: (value: f64) :ptr lib "pal"
+ 
+ // Create Some with pointer value.
+ extern fn maybe_some_ptr: (value: ptr) :ptr lib "pal"
+ 
+ // Create None value.
+ extern fn maybe_none_as_ptr: () :ptr lib "pal"
+ 
+ // Check if Maybe is None.
+ extern fn maybe_is_none: (ptr: ptr) :bool lib "pal"
+ 
+ // Check if Maybe is Some.
+ extern fn maybe_is_some: (ptr: ptr) :bool lib "pal"
+ 
+ // Unwrap i64 from Some (panics on None).
+ extern fn maybe_unwrap_i64: (ptr: ptr, line: i64, col: i64, file: str) :i64 lib "pal"
+ 
+ // Unwrap string from Some (panics on None).
+ extern fn maybe_unwrap_str: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+ 
+ // Unwrap f64 from Some (panics on None).
+ extern fn maybe_unwrap_f64: (ptr: ptr, line: i64, col: i64, file: str) :f64 lib "pal"
+ 
+ // Unwrap pointer from Some (panics on None).
+ extern fn maybe_unwrap_ptr: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+ 
+ // Unwrap Or: get value or default for i64.
+ extern fn maybe_unwrap_or_i64: (ptr: ptr, default_val: i64) :i64 lib "pal"
+ 
+ // Unwrap Or: get value or default for string.
+ extern fn maybe_unwrap_or_str: (ptr: ptr, default_val: ptr) :ptr lib "pal"
+ 
+ // Unwrap Or: get value or default for f64.
+ extern fn maybe_unwrap_or_f64: (ptr: ptr, default_val: f64) :f64 lib "pal"
+ 
+ // Unwrap Or: get value or default for pointer.
+ extern fn maybe_unwrap_or_ptr: (ptr: ptr, default_val: ptr) :ptr lib "pal"
+ 
+ // Free a Maybe.
+ extern fn maybe_free: (ptr: ptr) lib "pal"
