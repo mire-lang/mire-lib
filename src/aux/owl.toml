@@ -1,0 +1,7 @@
+[project]
+name = "aux"
+entry = "pal.mire"
+
+[exports]
+pal = "pal.mire"
+macros = "macros"

@@ -1,0 +1,12 @@
+[project]
+name = "alloc"
+entry = "mod.mire"
+
+[exports]
+vec = "vec/mod.mire"
+map = "map/mod.mire"
+str = "str/mod.mire"
+arr = "arr/mod.mire"
+bytes = "bytes/mod.mire"
+maybe = "maybe/mod.mire"
+result = "result/mod.mire"

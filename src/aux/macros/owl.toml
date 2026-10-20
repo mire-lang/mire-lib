@@ -1,0 +1,14 @@
+[project]
+name = "macros"
+entry = "mod.mire"
+
+[exports]
+mod = "mod.mire"
+assert = "assert.mire"
+dbg = "dbg.mire"
+panic = "panic.mire"
+unreachable = "panic.mire"
+checks = "checks.mire"
+assert_eq = "checks.mire"
+assert_ne = "checks.mire"
+trace_i64 = "checks.mire"

@@ -1,0 +1,118 @@
+module vec
+
+// Vector operations using PAL for memory management.
+// The core vector operations (push, pop, len, get, etc.) are implemented
+// in the Mire runtime C code and exposed via PAL-compatible externs.
+// TODO: Move vector operations to PAL C library for full C independence.
+
+// ── Runtime externs (via PAL) ────────────────────────────────────────────
+extern fn rt_vecs_len: (list :&anything) :i64 lib "pal"
+extern fn rt_vecs_with_capacity_i64: (capacity :i64) :vec[i64] lib "pal"
+extern fn rt_vecs_push_i64: (list :vec[i64], value :i64) :vec[i64] lib "pal"
+extern fn rt_vecs_push_ptr: (list :vec[str], value :str) :vec[str] lib "pal"
+extern fn rt_vecs_set_i64: (list :&vec[i64], index :i64, value :i64) lib "pal"
+extern fn rt_vecs_pop: (list :&vec[i64]) :i64 lib "pal"
+extern fn rt_vecs_get_i64: (list :&vec[i64], index :i64) :i64 lib "pal"
+extern fn rt_vecs_get_ptr: (list, index :i64) :str lib "pal"
+extern fn rt_vecs_first: (list :&vec[i64], line :i64, col :i64, file :str) :i64 lib "pal"
+extern fn rt_vecs_last: (list :&vec[i64], line :i64, col :i64, file :str) :i64 lib "pal"
+extern fn rt_vecs_remove: (list :&vec[i64], index :i64) lib "pal"
+extern fn rt_vecs_clear: (list :&vec[i64]) lib "pal"
+extern fn rt_vecs_sort: (list :&vec[i64]) lib "pal"
+extern fn rt_vecs_reverse: (list :&vec[i64]) lib "pal"
+extern fn rt_vecs_unique: (list :&vec[i64]) lib "pal"
+extern fn rt_vecs_contains_i64: (list :&vec[i64], value :i64) :bool lib "pal"
+extern fn rt_vecs_index_of_i64: (list :&vec[i64], value :i64) :i64 lib "pal"
+extern fn rt_vecs_slice: (list :&vec[i64], start :i64, end :i64) :vec[i64] lib "pal"
+extern fn rt_vecs_flatten: (list :&vec[i64]) :vec[i64] lib "pal"
+extern fn rt_vecs_concat: (list :&vec[i64], other :&vec[i64]) lib "pal"
+extern fn rt_vecs_clone: (list :&vec[i64]) :vec[i64] lib "pal"
+extern fn rt_vecs_binary_search: (list :&vec[i64], value :i64) :i64 lib "pal"
+extern fn rt_strings_join_list: (list :&vec[str], sep :&str) :str lib "pal"
+
+// ── len ─────────────────────────────────────────────────────────
+pub fn len: (v :&anything) :i64 { return rt_vecs_len(v) }
+
+// ── with::capacity ──────────────────────────────────────────────
+pub fn with: () {
+    pub fn capacity: () {
+        pub fn i64: (capacity :i64) :vec[i64] { return rt_vecs_with_capacity_i64(capacity) }
+    }
+}
+
+// ── push ────────────────────────────────────────────────────────
+pub fn push: () {
+    pub fn i64: (v :vec[i64], value :i64) :vec[i64] { return rt_vecs_push_i64(v, value) }
+    pub fn str: (v :vec[str], value :str) :vec[str] { return rt_vecs_push_ptr(v, value) }
+}
+
+// ── pop ─────────────────────────────────────────────────────────
+pub fn pop: () {
+    pub fn i64: (v :&vec[i64]) :i64 { return rt_vecs_pop(v) }
+}
+
+// ── set ─────────────────────────────────────────────────────────
+pub fn set: () {
+    pub fn i64: (v :&vec[i64], index :i64, value :i64) { rt_vecs_set_i64(v, index, value) }
+}
+
+// ── get ─────────────────────────────────────────────────────────
+pub fn get: () {
+    pub fn i64: (v :&vec[i64], index :i64) :i64 { return rt_vecs_get_i64(v, index) }
+    pub fn str: (v :&vec[str], index :i64) :str { return rt_vecs_get_ptr(v, index) }
+}
+
+// ── first ───────────────────────────────────────────────────────
+pub fn first: () {
+    pub fn i64: (v :&vec[i64]) :i64 { return rt_vecs_first(v, 0, 0, "") }
+}
+
+// ── last ────────────────────────────────────────────────────────
+pub fn last: () {
+    pub fn i64: (v :&vec[i64]) :i64 { return rt_vecs_last(v, 0, 0, "") }
+}
+
+// ── remove ──────────────────────────────────────────────────────
+pub fn remove: (v :&vec[i64], index :i64) { rt_vecs_remove(v, index) }
+
+// ── clear ───────────────────────────────────────────────────────
+pub fn clear: (v :&vec[i64]) { rt_vecs_clear(v) }
+
+// ── sort ────────────────────────────────────────────────────────
+pub fn sort: (v :&vec[i64]) { rt_vecs_sort(v) }
+
+// ── reverse ─────────────────────────────────────────────────────
+pub fn reverse: (v :&vec[i64]) :vec[i64] { return rt_vecs_reverse(v) }
+
+// ── unique ──────────────────────────────────────────────────────
+pub fn unique: (v :&vec[i64]) :vec[i64] { return rt_vecs_unique(v) }
+
+// ── contains ────────────────────────────────────────────────────
+pub fn contains: () {
+    pub fn i64: (v :&vec[i64], value :i64) :bool { return rt_vecs_contains_i64(v, value) }
+}
+
+// ── index ───────────────────────────────────────────────────────
+pub fn index: () {
+    pub fn i64: (v :&vec[i64], value :i64) :i64 { return rt_vecs_index_of_i64(v, value) }
+}
+
+// ── slice ───────────────────────────────────────────────────────
+pub fn slice: (v :&vec[i64], start :i64, end :i64) :vec[i64] { return rt_vecs_slice(v, start, end) }
+
+// ── flatten ─────────────────────────────────────────────────────
+pub fn flatten: (v :&vec[i64]) :vec[i64] { return rt_vecs_flatten(v) }
+
+// ── concat ──────────────────────────────────────────────────────
+pub fn concat: (v :&vec[i64], other :&vec[i64]) { rt_vecs_concat(v, other) }
+
+// ── clone ───────────────────────────────────────────────────────
+pub fn clone: (v :&vec[i64]) :vec[i64] { return rt_vecs_clone(v) }
+
+// ── binary ──────────────────────────────────────────────────────
+pub fn binary: () {
+    pub fn search: (v :&vec[i64], value :i64) :i64 { return rt_vecs_binary_search(v, value) }
+}
+
+// ── join ────────────────────────────────────────────────────────
+pub fn join: (v :&vec[str], sep :&str) :str { return rt_strings_join_list(v, sep) }

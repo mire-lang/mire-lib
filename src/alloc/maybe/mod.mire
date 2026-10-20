@@ -1,0 +1,38 @@
+module maybe
+
+// ── PAL Maybe operations ───────────────────────────────────────────────────
+load mire::aux::pal
+
+// ── some ────────────────────────────────────────────────────────
+pub fn some: () {
+    pub fn i64: (value :i64) :ptr { return pal::maybe_some_i64(value) }
+    pub fn str: (value :str) :ptr { return pal::maybe_some_str(value) }
+    pub fn f64: (value :f64) :ptr { return pal::maybe_some_f64(value) }
+    pub fn ptr: (value :ptr) :ptr { return pal::maybe_some_ptr(value) }
+}
+
+// ── none ────────────────────────────────────────────────────────
+pub fn none: () :ptr { return pal::maybe_none_as_ptr() }
+
+// ── is ──────────────────────────────────────────────────────────
+pub fn is: () {
+    pub fn none: (ptr :ptr) :bool { return pal::maybe_is_none(ptr) }
+    pub fn some: (ptr :ptr) :bool { return pal::maybe_is_some(ptr) }
+}
+
+// ── unwrap ──────────────────────────────────────────────────────
+pub fn unwrap: () {
+    pub fn i64: (ptr :ptr) :i64 { return pal::maybe_unwrap_i64(ptr, 0, 0, "") }
+    pub fn str: (ptr :ptr) :ptr { return pal::maybe_unwrap_str(ptr, 0, 0, "") }
+    pub fn f64: (ptr :ptr) :f64 { return pal::maybe_unwrap_f64(ptr, 0, 0, "") }
+    pub fn ptr: (ptr :ptr) :ptr { return pal::maybe_unwrap_ptr(ptr, 0, 0, "") }
+    pub fn or: () {
+        pub fn i64: (ptr :ptr, default :i64) :i64 { return pal::maybe_unwrap_or_i64(ptr, default) }
+        pub fn str: (ptr :ptr, default :ptr) :ptr { return pal::maybe_unwrap_or_str(ptr, default) }
+        pub fn f64: (ptr :ptr, default :f64) :f64 { return pal::maybe_unwrap_or_f64(ptr, default) }
+        pub fn ptr: (ptr :ptr, default :ptr) :ptr { return pal::maybe_unwrap_or_ptr(ptr, default) }
+    }
+}
+
+// ── free ────────────────────────────────────────────────────────
+pub fn free: (ptr :ptr) { pal::maybe_free(ptr) }

@@ -1,0 +1,95 @@
+module err
+
+// Standard error.
+//
+// Everything goes through the C stdio stream for stderr and is flushed on every
+// call, so a prompt appears immediately even when stdout is a pipe rather than a
+// terminal, and a program that writes a lot does not lose a partial line on exit.
+//
+// Writes are binary safe: they copy a byte count and never stop at a NUL, so a
+// payload read from a file can be echoed back unchanged. Each write returns the
+// number of bytes written, or -1 if the stream rejected it.
+//
+// ON THE `sel` LOCAL: the selector is bound to a named local rather than passed
+// as a bare literal at each call site, so a reader can see which stream a call
+// targets without counting to the argument list. It is a readability choice, not
+// a workaround.
+
+// ── PAL I/O ──────────────────────────────────────────────────────────────────
+load mire::aux::pal
+
+cons SEL_ERR = 2 :i64
+
+// ── text ───────────────────────────────────────────────────────────────────
+
+// Write text with no trailing newline. Returns the byte count written.
+pub fn print: (s :&str) :i64 {
+    return pal::io_write(SEL_ERR s)
+}
+
+// Write text followed by a newline, as a single write so the line cannot be
+// split across two flushes by another writer.
+pub fn println: (s :&str) :i64 {
+    return pal::io_write_line(SEL_ERR s)
+}
+
+// Write at most `count` bytes of text, for a payload that carries a separate
+// length. Embedded NULs are written as ordinary bytes.
+pub fn write_n: (s :&str, count :i64) :i64 {
+    return pal::io_write_n(SEL_ERR s count)
+}
+
+// Alias for `write_n`, matching the `write` spelling `in` uses for its
+// counterpart. Kept so a caller does not have to know which of the two streams
+// named its write method differently.
+pub fn write: (s :&str, count :i64) :i64 {
+    return pal::io_write_n(SEL_ERR s count)
+}
+
+// ── numbers ──────────────────────────────────────────────────────────────────
+
+// Write an integer with no trailing newline. Formatted natively by the runtime,
+// so printing a number never allocates a string.
+pub fn print_i64_no_newline: (value :i64) :i64 {
+    return pal::io_write_i64(SEL_ERR value 0)
+}
+
+// Write an integer followed by a newline.
+pub fn print_i64: (value :i64) :i64 {
+    return pal::io_write_i64(SEL_ERR value 1)
+}
+
+// Write a float followed by a newline, using the shortest representation that
+// round-trips. That is the right default for diagnostics.
+pub fn print_f64: (value :f64) :i64 {
+    return pal::io_write_f64(SEL_ERR value 1)
+}
+
+// Write a float with no trailing newline, in the same shortest round-tripping
+// form as print_f64.
+pub fn print_f64_no_newline: (value :f64) :i64 {
+    return pal::io_write_f64(SEL_ERR value 0)
+}
+
+// ── stream state ─────────────────────────────────────────────────────────────
+
+// Flush buffered output. Returns 0 on success.
+pub fn flush: () :i64 {
+    return pal::io_flush(SEL_ERR)
+}
+
+// True when an earlier write failed, i.e. the stream is in an error state.
+pub fn failed: () :bool {
+    return pal::io_error(SEL_ERR) == 1
+}
+
+// Clear the error and end-of-file indicators so the stream can be reused.
+pub fn clear: () :i64 {
+    return pal::io_clear(SEL_ERR)
+}
+
+// The raw descriptor behind stderr, for handing to something that needs an fd
+// rather than a stream, such as wiring a child process's output.
+pub fn fd: () :i64 {
+    return pal::io_fd(SEL_ERR)
+}

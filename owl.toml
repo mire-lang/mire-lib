@@ -1,8 +1,8 @@
 [project]
 name = "mire"
-version = "1.2.0"
-description = "Library for the Mire language"
-entry = "code/mod.mire"
+version = "2.0.0-beta"
+description = "Library for the Mire language - stdlib reorganization (beta)"
+entry = "src/lib.mire"
 
 [build]
 compiler = "mire"
@@ -16,11 +16,11 @@ incremental = true
 debug-info = true
 
 [paths]
-sources = "."
+sources = "src"
 tests = "tests"
 output = "bin"
 cache = "bin/.cache"
-source = "."
+source = "src"
 test = "tests"
 bin = "bin"
 generated = "bin/generated"
@@ -29,36 +29,45 @@ generated = "bin/generated"
 publisher = "publish.toml"
 registry = "mor"
 
+[dependencies]
+
 [exports]
-vec = "core/vec"
-map = "core/map"
-str = "core/str"
-std = "core/std"
-maybe = "core/maybe"
-result = "core/result"
-arr = "core/arr"
-json = "core/json"
-toml = "core/toml"
-# serde = "core/serde"    # Will add later
-macros = "core/macros"
+# Namespaces - the directories the entry point re-exports (mire::alloc::vec,
+# mire::std::out, mire::aux::pal). A `load` walk needs each intermediate segment
+# to resolve to a directory, so these must be listed alongside the flat aliases.
+alloc = "src/alloc"
+std = "src/std"
+aux = "src/aux"
+
+# alloc/ - flat aliases kept for `load mire::vec`, `load mire::str`, ...
+vec = "src/alloc/vec"
+map = "src/alloc/map"
+str = "src/alloc/str"
+arr = "src/alloc/arr"
+bytes = "src/alloc/bytes"
+maybe = "src/alloc/maybe"
+result = "src/alloc/result"
+
+# aux/ - auxiliary macros, panic, test, startup, backtrace
+macros = "src/aux/macros"
 
 [macros]
-assert = "core/macros/assert"
-dbg = "core/macros/dbg"
-panic = "core/macros/panic"
-unreachable = "core/macros/panic"
-assert_eq = "core/macros/checks"
-assert_ne = "core/macros/checks"
-trace_i64 = "core/macros/checks"
+assert = "src/aux/macros/assert"
+dbg = "src/aux/macros/dbg"
+panic = "src/aux/macros/panic"
+unreachable = "src/aux/macros/panic"
+assert_eq = "src/aux/macros/checks"
+assert_ne = "src/aux/macros/checks"
+trace_i64 = "src/aux/macros/checks"
 
 [security]
 mode = "strict"
-externs = ["rt_*", "owl_archive_*"]
-extern_libs = ["c"]
+externs = ["rt_*", "pal_*", "owl_archive_*"]
+extern_libs = ["c", "pal"]
 macros = ["assert", "dbg", "panic", "unreachable", "assert_eq", "assert_ne", "trace_i64"]
 
 [c]
-sources = ["code/c/json_parser.c"]
+sources = ["code/c/json_parser.c", "code/c/toml_parser.c"]
 libs = ["m"]
 ["owl@lock"]
 version = "3"

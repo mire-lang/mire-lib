@@ -1,0 +1,24 @@
+// Numeric assertion macros shipped by Mire.
+//
+// These are real Mire functions marked as macros: the compiler validates that
+// they are invoked with `!`, applies the macro security allowlist, and keeps
+// their body inside the normal type/borrow checking pipeline.
+
+load mire::aux::pal
+
+@[macro!] pub fn assert_eq: (actual :i64 expected :i64 msg :str) {
+    if actual != expected {
+        pal::assert_fail(msg)
+    }
+}
+
+@[macro!] pub fn assert_ne: (actual :i64 unexpected :i64 msg :str) {
+    if actual == unexpected {
+        pal::assert_fail(msg)
+    }
+}
+
+@[macro!] pub fn trace_i64: (value :i64) :i64 {
+    dasu(value)
+    return value
+}

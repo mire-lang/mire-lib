@@ -2,6 +2,53 @@
 
 All notable changes to the mire standard library.
 
+## [2.0.0-beta] - 2026-10-20 (PAL bindings, nested namespaces, `cons` constants)
+
+### Changed
+
+- **`mire::aux::pal` now binds real runtime symbols.** The old file declared
+  fictitious `io_write`, `io_read_line`, etc. as C symbols that do not exist, so
+  any module that reached it (`bytes`, `map`, `arr`, `result`, `maybe`, `std`)
+  failed at link time. Every extern now names a symbol the Avenys runtime /
+  PAL C layer actually defines (`rt_io_write`, `rt_io_read_all`,
+  `pal_time_monotonic_ns`, ...). PAL symbols (`pal_*`) are preferred over
+  runtime symbols (`rt_*`) where one exists.
+- **Stream selectors are local `cons`, not `pub const`.** Mire has no
+  `pub const`, so `pal::SEL_OUT`/`SEL_ERR`/`SEL_IN` are gone. Each stream
+  module defines its own `cons SEL_OUT = 1 :i64` / `cons SEL_ERR = 2 :i64`
+  matching the runtime's `rt_io_*` selector convention (1 = stdout,
+  2 = stderr, 3 = stdin).
+- **`owl.toml` lists namespaces alongside flat aliases.** `alloc = "src/alloc"`,
+  `std = "src/std"`, `aux = "src/aux"` are declared so a `load` walk can resolve
+  each intermediate segment to a directory. Flat aliases (`vec`, `str`, ...) are
+  kept for `load mire::vec`, `load mire::str`, etc.
+- **`pal` added to `extern_libs`** so `rt_io_*` / `pal_time_*` link under
+  `strict` security mode.
+- **`std::flush` uses `out::SEL_OUT` / `err::SEL_ERR`** instead of literal
+  stream numbers.
+
+### Added
+
+- **`out::write` / `err::write`** as aliases of `write_n`, matching the `write`
+  spelling `in` uses for its counterpart.
+- **`vec::binary::search`** backed by the existing `rt_vecs_binary_search`
+  runtime function.
+- **Time functions in `pal`**: `time_monotonic_ns`, `time_now_ms`,
+  `time_now_ns` (wrapping `pal_time_monotonic_ns`, `pal_time_now_ms`,
+  `pal_time_now_ns`).
+- **Per-directory `owl.toml`** for `alloc`, `aux`, and `aux/macros`, each
+  declaring its own `[exports]`.
+
+### Removed
+
+- `pub const SEL_OUT` / `SEL_ERR` / `SEL_IN` from `mire::aux::pal` (not valid
+  Mire syntax; the values live in `std::out` / `std::err` instead).
+
+### Requirements
+
+- Avenys with `cons` module-constant support and `rt_io_*` / `pal_time_*`
+  runtime symbols.
+
 ## [1.2.0] - 2026-09-30 (stdin module renamed to `in`, available() fixed)
 
 ### Changed
