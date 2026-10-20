@@ -1,385 +1,373 @@
-// PAL (Platform Abstraction Layer) bindings for Mire
-// Direct bindings to PAL C functions, replacing rt_* runtime calls.
-// This module provides the low-level PAL bindings that the stdlib uses
-// instead of calling into the C runtime (rt_* functions).
+// PAL (Platform Abstraction Layer) bindings for Mire.
+//
+// Every extern here names a symbol the Avenys runtime / PAL C layer actually
+// defines. The `pub fn` wrappers below keep short, stable names for the rest of
+// the stdlib; each one forwards to an extern whose *symbol name* is the one the
+// C side exports (see avenys/src/pal/pal.h for the PAL ABI, and
+// avenys/src/runtime/ for the rt_* runtime surface).
+//
+// This file was previously a set of inversions: it declared `io_write`,
+// `memory_alloc`, `bytes_alloc`, `ptr_add`, `bump_alloc`, ... as if they were
+// C symbols, but none of those exist. Only mire::vec and mire::str worked,
+// because those modules kept the real `rt_vecs_*` / `rt_strings_*` names. Any
+// module that reached this file (bytes, map, arr, result, maybe, std) would
+// have failed at link time.
+//
+// Two rules for edits here:
+//   1. An extern's name must be a symbol that exists. `nm` the runtime if
+//      unsure; the mapping is also listed in the comments by category.
+//   2. Prefer PAL symbols (`pal_*`) over runtime symbols (`rt_*`) where a PAL
+//      one exists, so the runtime C surface keeps shrinking toward the PAL.
 
 module pal
 
-// ── I/O ────────────────────────────────────────────────────────────────────
+// ── Stream selectors ────────────────────────────────────────────────────────
+// Match the runtime's rt_io_* selector convention: 1 = stdout, 2 = stderr,
+// 3 = stdin. Mire has no public module-level constants (`pub cons` is not in the
+// grammar), so each stream module defines its own local `cons` with the matching
+// value rather than importing one from here.
 
-// Stream selectors (match C runtime expectations)
-pub const SEL_OUT: i64 = 1
-pub const SEL_ERR: i64 = 2
-pub const SEL_IN: i64 = 3
+// ── I/O ─────────────────────────────────────────────────────────────────────
+// rt_io_* already route through pal_stdio_write / pal_stdin_read, so this is
+// the PAL path with the managed-string handling done for us.
+
+extern fn rt_io_write: (selector: i64, data: &str) :i64 lib "pal"
+extern fn rt_io_write_n: (selector: i64, data: &str, count: i64) :i64 lib "pal"
+extern fn rt_io_write_line: (selector: i64, data: &str) :i64 lib "pal"
+extern fn rt_io_write_i64: (selector: i64, value: i64, newline: i64) :i64 lib "pal"
+extern fn rt_io_write_f64: (selector: i64, value: f64, newline: i64) :i64 lib "pal"
+extern fn rt_io_flush: (selector: i64) :i64 lib "pal"
+extern fn rt_io_error: (selector: i64) :i64 lib "pal"
+extern fn rt_io_clear: (selector: i64) :i64 lib "pal"
+extern fn rt_io_fd: (selector: i64) :i64 lib "pal"
+extern fn rt_io_read_char: () :i64 lib "pal"
+extern fn rt_io_read_line: () :str lib "pal"
+extern fn rt_io_read_bytes: (count: i64) :str lib "pal"
+extern fn rt_io_read_all: () :str lib "pal"
+extern fn rt_io_available: () :i64 lib "pal"
+extern fn rt_io_is_tty: () :i64 lib "pal"
 
 // Write bytes to a stream. Returns bytes written, or -1 on error.
-extern fn io_write: (selector: i64, data: &str) :i64 lib "pal"
+pub fn io_write: (selector: i64, data: &str) :i64 { return rt_io_write(selector, data) }
 
 // Write up to `count` bytes from `data`. Returns bytes written.
-extern fn io_write_n: (selector: i64, data: &str, count: i64) :i64 lib "pal"
+pub fn io_write_n: (selector: i64, data: &str, count: i64) :i64 { return rt_io_write_n(selector, data, count) }
 
-// Write a line (data + newline) atomically.
-extern fn io_write_line: (selector: i64, data: &str) :i64 lib "pal"
+// Write a line (data + newline).
+pub fn io_write_line: (selector: i64, data: &str) :i64 { return rt_io_write_line(selector, data) }
 
 // Write an integer, optionally followed by newline.
-extern fn io_write_i64: (selector: i64, value: i64, newline: i64) :i64 lib "pal"
+pub fn io_write_i64: (selector: i64, value: i64, newline: i64) :i64 { return rt_io_write_i64(selector, value, newline) }
 
 // Write a float, optionally followed by newline.
-extern fn io_write_f64: (selector: i64, value: f64, newline: i64) :i64 lib "pal"
+pub fn io_write_f64: (selector: i64, value: f64, newline: i64) :i64 { return rt_io_write_f64(selector, value, newline) }
 
 // Flush a stream. Returns 0 on success.
-extern fn io_flush: (selector: i64) :i64 lib "pal"
+pub fn io_flush: (selector: i64) :i64 { return rt_io_flush(selector) }
 
-// Check if stream is in error state. Returns 1 if error, 0 otherwise.
-extern fn io_error: (selector: i64) :i64 lib "pal"
+// Check if a stream is in error state. Returns 1 if error, 0 otherwise.
+pub fn io_error: (selector: i64) :i64 { return rt_io_error(selector) }
 
-// Clear error and EOF indicators.
-extern fn io_clear: (selector: i64) :i64 lib "pal"
+// Clear error and end-of-file indicators.
+pub fn io_clear: (selector: i64) :i64 { return rt_io_clear(selector) }
 
-// Get raw file descriptor for a stream.
-extern fn io_fd: (selector: i64) :i64 lib "pal"
+// Get the raw file descriptor for a stream.
+pub fn io_fd: (selector: i64) :i64 { return rt_io_fd(selector) }
 
-// Read one byte (or -1 at EOF).
-extern fn io_read_char: () :i64 lib "pal"
+// Read one byte from stdin, or -1 at EOF.
+pub fn io_read_char: () :i64 { return rt_io_read_char() }
 
-// Read one line (without trailing newline).
-extern fn io_read_line: () :str lib "pal"
+// Read one line from stdin (without the trailing newline).
+pub fn io_read_line: () :str { return rt_io_read_line() }
 
-// Read up to `count` bytes.
-extern fn io_read_bytes: (count: i64) :str lib "pal"
+// Read up to `count` bytes from stdin.
+pub fn io_read_bytes: (count: i64) :str { return rt_io_read_bytes(count) }
 
 // Read all remaining input.
-extern fn io_read_all: () :str lib "pal"
+pub fn io_read_all: () :str { return rt_io_read_all() }
 
 // Bytes available for reading without blocking.
-extern fn io_available: () :i64 lib "pal"
+pub fn io_available: () :i64 { return rt_io_available() }
 
-// Check if stdin is a TTY.
-extern fn io_is_tty: () :i64 lib "pal"
+// True (1) when stdin is a TTY.
+pub fn io_is_tty: () :i64 { return rt_io_is_tty() }
 
-// ── Time ───────────────────────────────────────────────────────────────────
+// ── Time ────────────────────────────────────────────────────────────────────
 
-// Monotonic clock in nanoseconds.
-extern fn time_monotonic_ns: () :i64 lib "pal"
+extern fn pal_time_monotonic_ns: () :i64 lib "pal"
+extern fn pal_time_now_ms: () :i64 lib "pal"
+extern fn pal_time_now_ns: () :i64 lib "pal"
 
-// ── Memory ─────────────────────────────────────────────────────────────────
+// Monotonic clock in nanoseconds, for elapsed-time measurement.
+pub fn time_monotonic_ns: () :i64 { return pal_time_monotonic_ns() }
+
+// Wall-clock time in milliseconds.
+pub fn time_now_ms: () :i64 { return pal_time_now_ms() }
+
+// Wall-clock time in nanoseconds.
+pub fn time_now_ns: () :i64 { return pal_time_now_ns() }
+
+// ── Memory (PAL-owned) ──────────────────────────────────────────────────────
+
+extern fn pal_alloc: (size: i64) :ptr lib "pal"
+extern fn pal_free: (p: ptr) lib "pal"
+extern fn pal_realloc: (p: ptr, new_size: i64) :ptr lib "pal"
+extern fn pal_memory_reserve: (size: i64) :ptr lib "pal"
+extern fn pal_memory_release: (region: ptr, size: i64) :bool lib "pal"
 
 // Allocate raw memory (bytes). Returns null on failure.
-extern fn memory_alloc: (size: i64) :ptr lib "pal"
+pub fn memory_alloc: (size: i64) :ptr { return pal_alloc(size) }
 
 // Free raw memory allocated by memory_alloc.
-extern fn memory_free: (ptr: ptr) lib "pal"
+pub fn memory_free: (p: ptr) { pal_free(p) }
 
-// Reallocate memory.
-extern fn memory_realloc: (ptr: ptr, new_size: i64) :ptr lib "pal"
+// Reallocate raw memory.
+pub fn memory_realloc: (p: ptr, new_size: i64) :ptr { return pal_realloc(p, new_size) }
 
 // Reserve virtual address space without committing physical pages.
-// Returns null on failure.
-extern fn memory_reserve: (size: i64) :ptr lib "pal"
+pub fn memory_reserve: (size: i64) :ptr { return pal_memory_reserve(size) }
 
 // Release reserved virtual address space.
-extern fn memory_release: (region: ptr, size: i64) :i64 lib "pal"
+pub fn memory_release: (region: ptr, size: i64) :bool { return pal_memory_release(region, size) }
 
-// ── Process ────────────────────────────────────────────────────────────────
+// ── Stateless services ──────────────────────────────────────────────────────
 
-// Execute a program. Returns 0 on success, -1 on failure.
-extern fn proc_exec: (path: &str, args: &str) :i64 lib "pal"
+extern fn pal_mem_process_bytes: () :i64 lib "pal"
+extern fn pal_cpu_count: () :i64 lib "pal"
+extern fn pal_random_fill: (buf: ptr, length: i64) :bool lib "pal"
 
-// Spawn a child process. Returns PID on success, -1 on failure.
-extern fn proc_spawn: (path: &str, args: &str) :i64 lib "pal"
+// Process RSS in bytes.
+pub fn mem_process_rss: () :i64 { return pal_mem_process_bytes() }
 
-// Wait for a process to exit. Returns exit code.
-extern fn proc_wait: (pid: i64) :i64 lib "pal"
+// Logical CPU count.
+pub fn cpu_count: () :i64 { return pal_cpu_count() }
 
-// ── Filesystem ─────────────────────────────────────────────────────────────
+// Fill a buffer with random bytes. Returns true on success.
+pub fn random_fill: (buf: ptr, length: i64) :bool { return pal_random_fill(buf, length) }
 
-// Open a file. Returns a handle (ptr) or null on failure.
-extern fn fs_open: (path: &str, flags: i64, mode: i64) :ptr lib "pal"
+// ── Panic / Assert ──────────────────────────────────────────────────────────
+// The abort hook shared with bounds and division checks.
 
-// Read from a file handle.
-extern fn fs_read: (handle: ptr, buf: ptr, count: i64) :i64 lib "pal"
+extern fn rt_panic_loc: (msg: str, line: i64, col: i64, file: str) lib "pal"
+extern fn rt_panic: (msg: str) lib "pal"
 
-// Write to a file handle.
-extern fn fs_write: (handle: ptr, data: ptr, count: i64) :i64 lib "pal"
+// Abort the process with a message and source location.
+pub fn panic_loc: (msg: str, line: i64, col: i64, file: str) { rt_panic_loc(msg, line, col, file) }
 
-// Close a file handle.
-extern fn fs_close: (handle: ptr) :i64 lib "pal"
+// Abort the process with a message.
+pub fn assert_fail: (msg: str) { rt_panic(msg) }
 
-// Get file size.
-extern fn fs_size: (handle: ptr) :i64 lib "pal"
+// ── Bytes / raw buffers ─────────────────────────────────────────────────────
+// Raw (unmanaged) allocation plus typed little-endian access. Matched pairs:
+// bytes_alloc/bytes_free are rt_alloc_raw/rt_free_raw, never mixed with the
+// PAL-owned memory_alloc/memory_free above.
 
-// Seek within a file.
-extern fn fs_seek: (handle: ptr, offset: i64, whence: i64) :i64 lib "pal"
+extern fn rt_alloc_raw: (size: i64) :ptr lib "pal"
+extern fn rt_free_raw: (p: ptr) lib "pal"
+extern fn rt_ptr_add: (p: ptr, delta: i64) :ptr lib "pal"
+extern fn rt_read_u8: (p: ptr) :i64 lib "pal"
+extern fn rt_read_u16: (p: ptr) :i64 lib "pal"
+extern fn rt_read_u32: (p: ptr) :i64 lib "pal"
+extern fn rt_read_u64: (p: ptr) :i64 lib "pal"
+extern fn rt_write_u8: (p: ptr, value: i64) lib "pal"
+extern fn rt_write_u16: (p: ptr, value: i64) lib "pal"
+extern fn rt_write_u32: (p: ptr, value: i64) lib "pal"
+extern fn rt_write_u64: (p: ptr, value: i64) lib "pal"
 
-// Get current position.
-extern fn fs_tell: (handle: ptr) :i64 lib "pal"
+// Allocate a raw buffer of `size` bytes. Returns null on failure.
+pub fn bytes_alloc: (size: i64) :ptr { return rt_alloc_raw(size) }
 
-// ── Threads ────────────────────────────────────────────────────────────────
+// Free a buffer allocated by bytes_alloc.
+pub fn bytes_free: (p: ptr) { rt_free_raw(p) }
 
-// Create a new thread. Returns thread handle (ptr) or null.
-extern fn thread_spawn: (entry: ptr, arg: ptr) :ptr lib "pal"
+// Add `delta` bytes to a pointer.
+pub fn ptr_add: (p: ptr, delta: i64) :ptr { return rt_ptr_add(p, delta) }
 
-// Join a thread. Returns 0 on success.
-extern fn thread_join: (handle: ptr, ret_ptr: ptr) :i64 lib "pal"
+pub fn read_u8: (p: ptr) :i64 { return rt_read_u8(p) }
+pub fn read_u16: (p: ptr) :i64 { return rt_read_u16(p) }
+pub fn read_u32: (p: ptr) :i64 { return rt_read_u32(p) }
+pub fn read_u64: (p: ptr) :i64 { return rt_read_u64(p) }
 
-// ── Strings (managed) ──────────────────────────────────────────────────────
+pub fn write_u8: (p: ptr, value: i64) { rt_write_u8(p, value) }
+pub fn write_u16: (p: ptr, value: i64) { rt_write_u16(p, value) }
+pub fn write_u32: (p: ptr, value: i64) { rt_write_u32(p, value) }
+pub fn write_u64: (p: ptr, value: i64) { rt_write_u64(p, value) }
 
-// Allocate a managed string of given byte length.
-extern fn str_alloc: (len: i64) :str lib "pal"
+// ── Managed strings (runtime) ───────────────────────────────────────────────
 
-// Create a managed string from a C string.
-extern fn str_from_cstr: (cstr: ptr) :str lib "pal"
+extern fn rt_managed_from_slice: (src: ptr, len: i64) :str lib "pal"
+extern fn rt_managed_from_cstr: (cstr: ptr) :str lib "pal"
+extern fn rt_managed_len: (value: &str) :i64 lib "pal"
+extern fn rt_managed_alloc: (len: i64) :str lib "pal"
+extern fn rt_managed_retain: (value: str) lib "pal"
+extern fn rt_managed_free: (value: str) lib "pal"
+extern fn rt_managed_is_managed: (value: &str) :i64 lib "pal"
 
-// Get length of a managed string.
-extern fn str_len: (s: str) :i64 lib "pal"
+// Copy `len` bytes out of a raw buffer into a new managed string.
+pub fn managed_from_slice: (src: ptr, len: i64) :str { return rt_managed_from_slice(src, len) }
 
-// Retain a managed string (increment refcount).
-extern fn str_retain: (s: str) lib "pal"
+// Create a managed string from a NUL-terminated C string.
+pub fn str_from_cstr: (cstr: ptr) :str { return rt_managed_from_cstr(cstr) }
 
-// Release a managed string (decrement refcount, free if zero).
-extern fn str_release: (s: str) lib "pal"
+// Byte length of a managed string.
+pub fn managed_len: (value: &str) :i64 { return rt_managed_len(value) }
 
-// Check if a pointer is a managed string.
-extern fn str_is_managed: (s: str) :i64 lib "pal"
+// Allocate an uninitialised managed string of `len` bytes.
+pub fn str_alloc: (len: i64) :str { return rt_managed_alloc(len) }
 
-// ── Math ───────────────────────────────────────────────────────────────────
+// Increment a managed string's reference count.
+pub fn str_retain: (value: str) { rt_managed_retain(value) }
+
+// Decrement a managed string's reference count, freeing at zero.
+pub fn str_release: (value: str) { rt_managed_free(value) }
+
+// True (1) when the pointer is a runtime-managed string.
+pub fn str_is_managed: (value: &str) :i64 { return rt_managed_is_managed(value) }
+
+// ── Math ────────────────────────────────────────────────────────────────────
+
+extern fn rt_math_sqrt: (x: f64) :f64 lib "pal"
+extern fn rt_math_pow: (x: f64, y: f64) :f64 lib "pal"
+extern fn rt_math_fabs: (x: f64) :f64 lib "pal"
 
 // Absolute value for i64.
-extern fn math_abs_i64: (x: i64) :i64 lib "pal"
+pub fn math_abs_i64: (x: i64) :i64 {
+    if x < 0 {
+        return 0 - x
+    }
+    return x
+}
 
 // Absolute value for f64.
-extern fn math_abs_f64: (x: f64) :f64 lib "pal"
+pub fn math_abs_f64: (x: f64) :f64 { return rt_math_fabs(x) }
 
 // Square root for f64.
-extern fn math_sqrt_f64: (x: f64) :f64 lib "pal"
+pub fn math_sqrt_f64: (x: f64) :f64 { return rt_math_sqrt(x) }
 
 // Power for f64.
-extern fn math_pow_f64: (x: f64, y: f64) :f64 lib "pal"
+pub fn math_pow_f64: (x: f64, y: f64) :f64 { return rt_math_pow(x, y) }
 
-// ── Process metrics ────────────────────────────────────────────────────────
- 
- // Get process RSS in bytes.
- extern fn mem_process_rss: () :i64 lib "pal"
- 
- // Get logical CPU count.
- extern fn cpu_count: () :i64 lib "pal"
- 
- // ── Panic / Assert ─────────────────────────────────────────────────────────
- 
- // Abort the process with a message and source location.
- extern fn panic_loc: (msg: str, line: i64, col: i64, file: str) lib "pal"
- 
- // Assertion failure with message.
- extern fn assert_fail: (msg: str) lib "pal"
+// ── Maps ────────────────────────────────────────────────────────────────────
+// Backed by the runtime's rt_maps_* string-keyed map (dict) surface.
 
- // ── Bytes ──────────────────────────────────────────────────────────────────
+extern fn rt_maps_len: (dict: ptr) :i64 lib "pal"
+extern fn rt_maps_has: (dict: ptr, key: &str) :i64 lib "pal"
+extern fn rt_maps_is_empty: (dict: ptr) :i64 lib "pal"
+extern fn rt_maps_get: (dict: ptr, key: &str) :str lib "pal"
+extern fn rt_maps_get_i64: (dict: ptr, key: &str) :i64 lib "pal"
+extern fn rt_maps_set: (dict: ptr, key: &str, value: str) :ptr lib "pal"
+extern fn rt_maps_set_i64: (dict: ptr, key: &str, value: i64) :ptr lib "pal"
+extern fn rt_maps_remove: (dict: ptr, key: &str) :ptr lib "pal"
+extern fn rt_maps_keys: (dict: ptr) :ptr lib "pal"
+extern fn rt_maps_values: (dict: ptr) :ptr lib "pal"
+extern fn rt_maps_entries: (dict: ptr) :i64 lib "pal"
+extern fn rt_maps_merge: (a: ptr, b: ptr) :ptr lib "pal"
 
- // Allocate raw memory (bytes). Returns null on failure.
- extern fn bytes_alloc: (size: i64) :ptr lib "pal"
+pub fn map_len: (dict: ptr) :i64 { return rt_maps_len(dict) }
+pub fn map_has: (dict: ptr, key: &str) :bool { return rt_maps_has(dict, key) != 0 }
+pub fn map_is_empty: (dict: ptr) :bool { return rt_maps_is_empty(dict) != 0 }
+pub fn map_get_str: (dict: ptr, key: &str) :str { return rt_maps_get(dict, key) }
+pub fn map_get_i64: (dict: ptr, key: &str) :i64 { return rt_maps_get_i64(dict, key) }
+pub fn map_set_str: (dict: ptr, key: &str, value: str) :ptr { return rt_maps_set(dict, key, value) }
+pub fn map_set_i64: (dict: ptr, key: &str, value: i64) :ptr { return rt_maps_set_i64(dict, key, value) }
+pub fn map_remove: (dict: ptr, key: &str) :ptr { return rt_maps_remove(dict, key) }
+pub fn map_keys: (dict: ptr) :ptr { return rt_maps_keys(dict) }
+pub fn map_values: (dict: ptr) :ptr { return rt_maps_values(dict) }
+pub fn map_entries: (dict: ptr) :i64 { return rt_maps_entries(dict) }
+pub fn map_merge: (a: ptr, b: ptr) :ptr { return rt_maps_merge(a, b) }
 
- // Free raw memory allocated by bytes_alloc.
- extern fn bytes_free: (ptr: ptr) lib "pal"
+// ── Arrays ──────────────────────────────────────────────────────────────────
 
- // Add delta to a pointer.
- extern fn ptr_add: (ptr: ptr, delta: i64) :ptr lib "pal"
+extern fn rt_arr_len: (arr: ptr, count: i64) :i64 lib "pal"
+extern fn rt_arr_first_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
+extern fn rt_arr_last_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
+extern fn rt_arr_contains_i64: (arr: ptr, count: i64, needle: i64) :i64 lib "pal"
+extern fn rt_arr_index_of_i64: (arr: ptr, count: i64, needle: i64) :i64 lib "pal"
+extern fn rt_arr_reverse_i64: (arr: ptr, count: i64) lib "pal"
+extern fn rt_arr_join: (arr: ptr, count: i64, sep: ptr) :str lib "pal"
 
- // Read u8/u16/u32/u64 from pointer.
- extern fn read_u8: (ptr: ptr) :i64 lib "pal"
- extern fn read_u16: (ptr: ptr) :i64 lib "pal"
- extern fn read_u32: (ptr: ptr) :i64 lib "pal"
- extern fn read_u64: (ptr: ptr) :i64 lib "pal"
+pub fn arr_len: (arr: ptr, count: i64) :i64 { return rt_arr_len(arr, count) }
+pub fn arr_first_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 { return rt_arr_first_i64(arr, count, line, col, file) }
+pub fn arr_last_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 { return rt_arr_last_i64(arr, count, line, col, file) }
+pub fn arr_contains_i64: (arr: ptr, count: i64, needle: i64) :bool { return rt_arr_contains_i64(arr, count, needle) != 0 }
+pub fn arr_index_of_i64: (arr: ptr, count: i64, needle: i64) :i64 { return rt_arr_index_of_i64(arr, count, needle) }
+pub fn arr_reverse_i64: (arr: ptr, count: i64) { rt_arr_reverse_i64(arr, count) }
+pub fn arr_join: (arr: ptr, count: i64, sep: ptr) :str { return rt_arr_join(arr, count, sep) }
 
- // Write u8/u16/u32/u64 to pointer.
- extern fn write_u8: (ptr: ptr, value: i64) lib "pal"
- extern fn write_u16: (ptr: ptr, value: i64) lib "pal"
- extern fn write_u32: (ptr: ptr, value: i64) lib "pal"
- extern fn write_u64: (ptr: ptr, value: i64) lib "pal"
+// ── Result ──────────────────────────────────────────────────────────────────
 
- // Create managed string from slice.
- extern fn managed_from_slice: (src: ptr, len: i64) :str lib "pal"
+extern fn rt_result_ok_i64: (value: i64) :ptr lib "pal"
+extern fn rt_result_ok_str: (value: str) :ptr lib "pal"
+extern fn rt_result_ok_ptr: (value: ptr) :ptr lib "pal"
+extern fn rt_result_err_i64: (error: i64) :ptr lib "pal"
+extern fn rt_result_err_str: (error: str) :ptr lib "pal"
+extern fn rt_result_err_ptr: (error: ptr) :ptr lib "pal"
+extern fn rt_result_is_ok: (p: ptr) :i64 lib "pal"
+extern fn rt_result_is_err: (p: ptr) :i64 lib "pal"
+extern fn rt_result_err_payload: (p: ptr) :ptr lib "pal"
+extern fn rt_result_unwrap_i64: (p: ptr, line: i64, col: i64, file: str) :i64 lib "pal"
+extern fn rt_result_unwrap_str: (p: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+extern fn rt_result_unwrap_f64: (p: ptr, line: i64, col: i64, file: str) :f64 lib "pal"
+extern fn rt_result_unwrap_ptr: (p: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+extern fn rt_result_unwrap_err_str: (p: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+extern fn rt_result_unwrap_or_i64: (p: ptr, default_val: i64) :i64 lib "pal"
+extern fn rt_result_unwrap_or_str: (p: ptr, default_val: ptr) :ptr lib "pal"
+extern fn rt_result_unwrap_or_f64: (p: ptr, default_val: f64) :f64 lib "pal"
+extern fn rt_result_unwrap_or_ptr: (p: ptr, default_val: ptr) :ptr lib "pal"
+extern fn rt_result_free: (p: ptr) lib "pal"
 
- // Get length of managed string.
- extern fn managed_len: (value: &str) :i64 lib "pal"
+pub fn result_ok_i64: (value: i64) :ptr { return rt_result_ok_i64(value) }
+pub fn result_ok_str: (value: str) :ptr { return rt_result_ok_str(value) }
+pub fn result_ok_ptr: (value: ptr) :ptr { return rt_result_ok_ptr(value) }
+pub fn result_err_i64: (error: i64) :ptr { return rt_result_err_i64(error) }
+pub fn result_err_str: (error: str) :ptr { return rt_result_err_str(error) }
+pub fn result_err_ptr: (error: ptr) :ptr { return rt_result_err_ptr(error) }
+pub fn result_is_ok: (p: ptr) :bool { return rt_result_is_ok(p) != 0 }
+pub fn result_is_err: (p: ptr) :bool { return rt_result_is_err(p) != 0 }
+pub fn result_err_payload: (p: ptr) :ptr { return rt_result_err_payload(p) }
+pub fn result_unwrap_i64: (p: ptr, line: i64, col: i64, file: str) :i64 { return rt_result_unwrap_i64(p, line, col, file) }
+pub fn result_unwrap_str: (p: ptr, line: i64, col: i64, file: str) :ptr { return rt_result_unwrap_str(p, line, col, file) }
+pub fn result_unwrap_f64: (p: ptr, line: i64, col: i64, file: str) :f64 { return rt_result_unwrap_f64(p, line, col, file) }
+pub fn result_unwrap_ptr: (p: ptr, line: i64, col: i64, file: str) :ptr { return rt_result_unwrap_ptr(p, line, col, file) }
+pub fn result_unwrap_err_str: (p: ptr, line: i64, col: i64, file: str) :ptr { return rt_result_unwrap_err_str(p, line, col, file) }
+pub fn result_unwrap_or_i64: (p: ptr, default_val: i64) :i64 { return rt_result_unwrap_or_i64(p, default_val) }
+pub fn result_unwrap_or_str: (p: ptr, default_val: ptr) :ptr { return rt_result_unwrap_or_str(p, default_val) }
+pub fn result_unwrap_or_f64: (p: ptr, default_val: f64) :f64 { return rt_result_unwrap_or_f64(p, default_val) }
+pub fn result_unwrap_or_ptr: (p: ptr, default_val: ptr) :ptr { return rt_result_unwrap_or_ptr(p, default_val) }
+pub fn result_free: (p: ptr) { rt_result_free(p) }
 
-// ── Maps ───────────────────────────────────────────────────────────────────
- 
- // Get length of a map.
- extern fn map_len: (dict: ptr) :i64 lib "pal"
- 
- // Check if map has a key.
- extern fn map_has: (dict: ptr, key: &str) :bool lib "pal"
- 
- // Check if map is empty.
- extern fn map_is_empty: (dict: ptr) :bool lib "pal"
- 
- // Get string value from map.
- extern fn map_get_str: (dict: ptr, key: &str) :str lib "pal"
- 
- // Get i64 value from map.
- extern fn map_get_i64: (dict: ptr, key: &str) :i64 lib "pal"
- 
- // Set string value in map.
- extern fn map_set_str: (dict: ptr, key: &str, value: &str) :ptr lib "pal"
- 
- // Set i64 value in map.
- extern fn map_set_i64: (dict: ptr, key: &str, value: i64) :ptr lib "pal"
- 
- // Remove a key from map.
- extern fn map_remove: (dict: ptr, key: &str) lib "pal"
- 
- // Get all keys from map.
- extern fn map_keys: (dict: ptr) :ptr lib "pal"
- 
- // Get all values from map.
- extern fn map_values: (dict: ptr) :ptr lib "pal"
- 
- // Get all entries from map.
- extern fn map_entries: (dict: ptr) :i64 lib "pal"
- 
- // Merge two maps.
- extern fn map_merge: (dict: ptr, other: ptr) :ptr lib "pal"
- 
- // ── Arrays ──────────────────────────────────────────────────────────────────
- 
- // Get length of an array.
- extern fn arr_len: (arr: ptr, count: i64) :i64 lib "pal"
- 
- // Get first element of an array.
- extern fn arr_first_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
- 
- // Get last element of an array.
- extern fn arr_last_i64: (arr: ptr, count: i64, line: i64, col: i64, file: str) :i64 lib "pal"
- 
- // Check if array contains a value.
- extern fn arr_contains_i64: (arr: ptr, count: i64, needle: i64) :bool lib "pal"
- 
- // Find index of a value in array.
- extern fn arr_index_of_i64: (arr: ptr, count: i64, needle: i64) :i64 lib "pal"
- 
- // Reverse an array in place.
- extern fn arr_reverse_i64: (arr: ptr, count: i64) lib "pal"
- 
- // Join array elements with separator.
- extern fn arr_join: (arr: ptr, count: i64, sep: ptr) :ptr lib "pal"
- 
- // ── Result ───────────────────────────────────────────────────────────────────
- 
- // Create Ok result with i64 value.
- extern fn result_ok_i64: (value: i64) :ptr lib "pal"
- 
- // Create Ok result with string value.
- extern fn result_ok_str: (value: str) :ptr lib "pal"
- 
- // Create Ok result with pointer value.
- extern fn result_ok_ptr: (value: ptr) :ptr lib "pal"
- 
- // Create Err result with i64 error.
- extern fn result_err_i64: (error: i64) :ptr lib "pal"
- 
- // Create Err result with string error.
- extern fn result_err_str: (error: str) :ptr lib "pal"
- 
- // Create Err result with pointer error.
- extern fn result_err_ptr: (error: ptr) :ptr lib "pal"
- 
- // Check if result is Ok.
- extern fn result_is_ok: (ptr: ptr) :bool lib "pal"
- 
- // Check if result is Err.
- extern fn result_is_err: (ptr: ptr) :bool lib "pal"
- 
- // Get error payload from Err result.
- extern fn result_err_payload: (ptr: ptr) :ptr lib "pal"
- 
- // Unwrap i64 from Ok result (panics on Err).
- extern fn result_unwrap_i64: (ptr: ptr, line: i64, col: i64, file: str) :i64 lib "pal"
- 
- // Unwrap string from Ok result (panics on Err).
- extern fn result_unwrap_str: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
- 
- // Unwrap f64 from Ok result (panics on Err).
- extern fn result_unwrap_f64: (ptr: ptr, line: i64, col: i64, file: str) :f64 lib "pal"
- 
- // Unwrap pointer from Ok result (panics on Err).
- extern fn result_unwrap_ptr: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
- 
- // Unwrap error string from Err result (panics on Ok).
- extern fn result_unwrap_err_str: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
- 
- // Unwrap Or: get value or default for i64.
- extern fn result_unwrap_or_i64: (ptr: ptr, default_val: i64) :i64 lib "pal"
- 
- // Unwrap Or: get value or default for string.
- extern fn result_unwrap_or_str: (ptr: ptr, default_val: ptr) :ptr lib "pal"
- 
- // Unwrap Or: get value or default for f64.
- extern fn result_unwrap_or_f64: (ptr: ptr, default_val: f64) :f64 lib "pal"
- 
- // Unwrap Or: get value or default for pointer.
- extern fn result_unwrap_or_ptr: (ptr: ptr, default_val: ptr) :ptr lib "pal"
- 
- // Free a result.
- extern fn result_free: (ptr: ptr) lib "pal"
- 
- // ── Maybe ───────────────────────────────────────────────────────────────────
- 
- // Create Some with i64 value.
- extern fn maybe_some_i64: (value: i64) :ptr lib "pal"
- 
- // Create Some with string value.
- extern fn maybe_some_str: (value: str) :ptr lib "pal"
- 
- // Create Some with f64 value.
- extern fn maybe_some_f64: (value: f64) :ptr lib "pal"
- 
- // Create Some with pointer value.
- extern fn maybe_some_ptr: (value: ptr) :ptr lib "pal"
- 
- // Create None value.
- extern fn maybe_none_as_ptr: () :ptr lib "pal"
- 
- // Check if Maybe is None.
- extern fn maybe_is_none: (ptr: ptr) :bool lib "pal"
- 
- // Check if Maybe is Some.
- extern fn maybe_is_some: (ptr: ptr) :bool lib "pal"
- 
- // Unwrap i64 from Some (panics on None).
- extern fn maybe_unwrap_i64: (ptr: ptr, line: i64, col: i64, file: str) :i64 lib "pal"
- 
- // Unwrap string from Some (panics on None).
- extern fn maybe_unwrap_str: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
- 
- // Unwrap f64 from Some (panics on None).
- extern fn maybe_unwrap_f64: (ptr: ptr, line: i64, col: i64, file: str) :f64 lib "pal"
- 
- // Unwrap pointer from Some (panics on None).
- extern fn maybe_unwrap_ptr: (ptr: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
- 
- // Unwrap Or: get value or default for i64.
- extern fn maybe_unwrap_or_i64: (ptr: ptr, default_val: i64) :i64 lib "pal"
- 
- // Unwrap Or: get value or default for string.
- extern fn maybe_unwrap_or_str: (ptr: ptr, default_val: ptr) :ptr lib "pal"
- 
- // Unwrap Or: get value or default for f64.
- extern fn maybe_unwrap_or_f64: (ptr: ptr, default_val: f64) :f64 lib "pal"
- 
- // Unwrap Or: get value or default for pointer.
- extern fn maybe_unwrap_or_ptr: (ptr: ptr, default_val: ptr) :ptr lib "pal"
- 
-// Free a Maybe.
-extern fn maybe_free: (ptr: ptr) lib "pal"
+// ── Maybe ───────────────────────────────────────────────────────────────────
 
-// ── Bump allocator free list ──────────────────────────────────────────────
-// Find a free block of at least the given size. Returns size class index or -1.
-extern fn bump_free_list_find: (size: i64) :i64 lib "pal"
+extern fn rt_maybe_some_i64: (value: i64) :ptr lib "pal"
+extern fn rt_maybe_some_str: (value: str) :ptr lib "pal"
+extern fn rt_maybe_some_f64: (value: f64) :ptr lib "pal"
+extern fn rt_maybe_some_ptr: (value: ptr) :ptr lib "pal"
+extern fn rt_maybe_none_as_ptr: () :ptr lib "pal"
+extern fn rt_maybe_is_none: (p: ptr) :i64 lib "pal"
+extern fn rt_maybe_is_some: (p: ptr) :i64 lib "pal"
+extern fn rt_maybe_unwrap_i64: (p: ptr, line: i64, col: i64, file: str) :i64 lib "pal"
+extern fn rt_maybe_unwrap_str: (p: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+extern fn rt_maybe_unwrap_f64: (p: ptr, line: i64, col: i64, file: str) :f64 lib "pal"
+extern fn rt_maybe_unwrap_ptr: (p: ptr, line: i64, col: i64, file: str) :ptr lib "pal"
+extern fn rt_maybe_unwrap_or_i64: (p: ptr, default_val: i64) :i64 lib "pal"
+extern fn rt_maybe_unwrap_or_str: (p: ptr, default_val: ptr) :ptr lib "pal"
+extern fn rt_maybe_unwrap_or_f64: (p: ptr, default_val: f64) :f64 lib "pal"
+extern fn rt_maybe_unwrap_or_ptr: (p: ptr, default_val: ptr) :ptr lib "pal"
+extern fn rt_maybe_free: (p: ptr) lib "pal"
 
-// Pop a block from the free list. Returns the block pointer or null.
-extern fn bump_free_list_pop: (size_class: i64) :ptr lib "pal"
-
-/// Push a block back to the free list.
-extern fn bump_free_list_push: (ptr: ptr, size_class: i64) lib "pal"
-
-/// Initialize the bump allocator free list (called at startup).
-extern fn bump_free_list_init: () lib "pal"
+pub fn maybe_some_i64: (value: i64) :ptr { return rt_maybe_some_i64(value) }
+pub fn maybe_some_str: (value: str) :ptr { return rt_maybe_some_str(value) }
+pub fn maybe_some_f64: (value: f64) :ptr { return rt_maybe_some_f64(value) }
+pub fn maybe_some_ptr: (value: ptr) :ptr { return rt_maybe_some_ptr(value) }
+pub fn maybe_none_as_ptr: () :ptr { return rt_maybe_none_as_ptr() }
+pub fn maybe_is_none: (p: ptr) :bool { return rt_maybe_is_none(p) != 0 }
+pub fn maybe_is_some: (p: ptr) :bool { return rt_maybe_is_some(p) != 0 }
+pub fn maybe_unwrap_i64: (p: ptr, line: i64, col: i64, file: str) :i64 { return rt_maybe_unwrap_i64(p, line, col, file) }
+pub fn maybe_unwrap_str: (p: ptr, line: i64, col: i64, file: str) :ptr { return rt_maybe_unwrap_str(p, line, col, file) }
+pub fn maybe_unwrap_f64: (p: ptr, line: i64, col: i64, file: str) :f64 { return rt_maybe_unwrap_f64(p, line, col, file) }
+pub fn maybe_unwrap_ptr: (p: ptr, line: i64, col: i64, file: str) :ptr { return rt_maybe_unwrap_ptr(p, line, col, file) }
+pub fn maybe_unwrap_or_i64: (p: ptr, default_val: i64) :i64 { return rt_maybe_unwrap_or_i64(p, default_val) }
+pub fn maybe_unwrap_or_str: (p: ptr, default_val: ptr) :ptr { return rt_maybe_unwrap_or_str(p, default_val) }
+pub fn maybe_unwrap_or_f64: (p: ptr, default_val: f64) :f64 { return rt_maybe_unwrap_or_f64(p, default_val) }
+pub fn maybe_unwrap_or_ptr: (p: ptr, default_val: ptr) :ptr { return rt_maybe_unwrap_or_ptr(p, default_val) }
+pub fn maybe_free: (p: ptr) { rt_maybe_free(p) }

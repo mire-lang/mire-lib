@@ -55,5 +55,5 @@ pub fn is_tty: () :bool { return in::is_tty() }
 // Exits run this for you; it is here for a program that forks or execs and
 // needs its own output on disk before the child starts.
 pub fn flush: () :i64 {
-    return pal::io_flush(pal::SEL_OUT) + pal::io_flush(pal::SEL_ERR)
+    return pal::io_flush(out::SEL_OUT) + pal::io_flush(err::SEL_ERR)
 }

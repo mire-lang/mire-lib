@@ -32,7 +32,14 @@ registry = "mor"
 [dependencies]
 
 [exports]
-# alloc/ - memory management, data structures
+# Namespaces - the directories the entry point re-exports (mire::alloc::vec,
+# mire::std::out, mire::aux::pal). A `load` walk needs each intermediate segment
+# to resolve to a directory, so these must be listed alongside the flat aliases.
+alloc = "src/alloc"
+std = "src/std"
+aux = "src/aux"
+
+# alloc/ - flat aliases kept for `load mire::vec`, `load mire::str`, ...
 vec = "src/alloc/vec"
 map = "src/alloc/map"
 str = "src/alloc/str"
@@ -40,9 +47,6 @@ arr = "src/alloc/arr"
 bytes = "src/alloc/bytes"
 maybe = "src/alloc/maybe"
 result = "src/alloc/result"
-
-# std/ - platform operations via PAL
-std = "src/std"
 
 # aux/ - auxiliary macros, panic, test, startup, backtrace
 macros = "src/aux/macros"
@@ -58,8 +62,8 @@ trace_i64 = "src/aux/macros/checks"
 
 [security]
 mode = "strict"
-externs = ["rt_*", "owl_archive_*"]
-extern_libs = ["c"]
+externs = ["rt_*", "pal_*", "owl_archive_*"]
+extern_libs = ["c", "pal"]
 macros = ["assert", "dbg", "panic", "unreachable", "assert_eq", "assert_ne", "trace_i64"]
 
 [c]
