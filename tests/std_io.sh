@@ -28,6 +28,12 @@ fi
 # directory that *contains* packages, so it gets the parent of this repository.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIB_DIR="$(dirname "$REPO_ROOT")"
+
+# CI override: allow the library directory to be set explicitly (e.g. when
+# Mire is installed into ~/.owl/libs rather than alongside the repo checkout).
+if [ -n "${MIRE_LIB_DIR:-}" ]; then
+    LIB_DIR="$MIRE_LIB_DIR"
+fi
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/mire-stdio-XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 

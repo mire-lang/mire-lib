@@ -1,4 +1,4 @@
-# mire v1.3.0
+# mire v2.0.0-beta
 
 Standard library for the [Mire](https://github.com/mire-lang) programming language.
 
@@ -7,19 +7,21 @@ Standard library for the [Mire](https://github.com/mire-lang) programming langua
 | Module | Description |
 |--------|-------------|
 | `mire::std` | Standard streams: `in` (stdin), `out` (stdout), `err` (stderr) |
-| `mire::vec` | Vector operations (`push::i64`, `get`, `set`, `len`, `sort`, etc.) |
+| `mire::vec` | Vector operations (`push::i64`, `get`, `set`, `len`, `sort`, `binary::search`, etc.) |
 | `mire::map` | Map/dictionary operations (`get::i64`, `set::i64`, `has`, `keys`, `values`, `count`) |
 | `mire::str` | String operations (`len`, `upper`, `lower`, `split`, `join`, `pad`, `from::bool`, etc.) |
 | `mire::maybe` | Optional handles (`some`, `none`, `is`, `unwrap`, `unwrap::or`, `free`) |
 | `mire::result` | Result handles (`ok`, `err`, `is`, `unwrap`, `unwrap::or`, `free`) |
 | `mire::arr` | Fixed-size array operations (`new`, `get`, `set`, `len`) |
+| `mire::bytes` | Raw byte buffers and binary framing (`alloc`, `get_u8`, `set_u8`, `to_str`, ...) |
+| `mire::aux::pal` | Platform Abstraction Layer bindings (`rt_io_*`, `pal_time_*`, ...) |
 
 ## Usage
 
 ```toml
 # owl.toml
 [dependencies]
-    mire = "1.2.0"
+    mire = "2.0.0-beta"
 ```
 
 ```mire
@@ -41,35 +43,17 @@ pub fn main: () {
 
 ## Design
 
-- **Nested function grouping**: `push::i64`, `get::i64`, `set::i64` — type suffixes for polymorphic operations
-- **Independent package**: does not require kioto as a dependency
-- **Explicit module loading**: use `load mire::<module>`; the package entry is
-  intentionally not an aggregate re-export.
-- **Thin wrappers**: each function wraps a single runtime C function (`rt_*`)
-- **Standard streams live in `mire::std`**: `in`, `out` and `err`, or the
-  flat `std::print` / `std::read_line` / `std::flush` forms. The module is named
-  `in` to match the `for`/`find` iterator, and requires Avenys `v4.3.2`
-  ([PR #33](https://github.com/mire-lang/Avenys-rust/pull/33)), which accepts the
-  `in` keyword as a module name, a load path segment and a call head. Writes go
-  through the C `FILE*` rather than the raw descriptor so that stream writes and
-  `printf`-based output interleave in call order. Reads are binary-safe and never
-  truncate at a NUL: `byte()` returns `-1` at end of input, so EOF is
-  distinguishable from a zero byte. `available()` answers from the runtime's own
-  buffer first, so a reader that trusts it will not block on bytes that have
-  already been read. Writes return the number of bytes written, not `0`/`1`, so a
-  short write is detectable.
-- **Growing collections return the new value**: `vec::push`, `map::set`, and
-  `map::merge` may reallocate the backing storage, so they return the collection
-  and you reassign (`set v = vec::push::i64(v 42)`). Read-only functions
-  (`len`, `get`, `has`, `keys`, `values`, ...) take `&anything` and never move
-  the value. `vec::set::i64` writes an element in place.
+- **Nested function grouping**: `push::i64`, `get::i64`, `set::i64` — type suffixes for polymorphic operations. Overloads live under their type: `vec::pop::i64(...)`, `vec::with::capacity::i64(...)`.
+- **Module constants use `cons`**: Mire has no `pub const`; each stream module defines its own local `cons SEL_OUT = 1 :i64` / `cons SEL_ERR = 2 :i64` (matching the runtime's `rt_io_*` selector convention: 1 = stdout, 2 = stderr, 3 = stdin).
+- **Independent package**: does not require kioto as a dependency.
+- **Explicit module loading**: use `load mire::<module>`; each intermediate segment resolves to a directory listed in `[exports]` of `owl.toml`.
+- **PAL-backed externs**: `mire::aux::pal` declares real runtime symbols (`rt_io_write`, `rt_io_read_all`, `pal_time_monotonic_ns`, ...). No fictitious `io_*` names.
+- **Standard streams live in `mire::std`**: `in`, `out` and `err`, or the flat `std::print` / `std::read_line` / `std::flush` forms. Reads are binary-safe and never truncate at a NUL: `byte()` returns `-1` at end of input, so EOF is distinguishable from a zero byte. `available()` answers from the runtime's own buffer first.
+- **Growing collections return the new value**: `vec::push`, `map::set`, and `map::merge` may reallocate the backing storage, so they return the collection and you reassign (`set v = vec::push::i64(v 42)`). Read-only functions (`len`, `get`, `has`, `keys`, `values`, ...) take `&anything` and never move the value.
 - **`str::from::bool`** takes `:bool` and produces `"true"`/`"false"`.
-- **Padding uses strings**: `str::pad::left/right` accept a `&str` pad value,
-  matching the runtime ABI and allowing multi-byte padding sequences.
-- **Owned optional/result handles**: values returned by `maybe` and `result`
-  are runtime-owned pointers and must be released with the matching `free`
-  function after their last use.
-- **No version()**: version is tracked in `owl.toml` and the lockfile
+- **Padding uses strings**: `str::pad::left/right` accept a `&str` pad value, matching the runtime ABI and allowing multi-byte padding sequences.
+- **Owned optional/result handles**: values returned by `maybe` and `result` are runtime-owned pointers and must be released with the matching `free` function after their last use.
+- **No `version()`**: version is tracked in `owl.toml` and the lockfile.
 
 ## Building
 

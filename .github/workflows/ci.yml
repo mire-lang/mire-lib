@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [beta-stdlib, main, master]
+  pull_request:
+    branches: [beta-stdlib, main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            wget ca-certificates pkg-config build-essential \
+            libsodium-dev zlib1g-dev libzstd-dev libarchive-dev \
+            zsh protobuf-compiler tcc libtcc-dev gcc
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install LLVM 22 (required by the Mire compiler / Avenys)
+        run: |
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 22
+          sudo apt-get install -y -qq \
+            llvm-22 llvm-22-dev llvm-22-tools clang-22 lld-22 libpolly-22-dev
+          echo "/usr/lib/llvm-22/bin" >> "$GITHUB_PATH"
+
+      - name: Checkout Avenys (the Mire compiler) as a dependency
+        uses: actions/checkout@v4
+        with:
+          repository: mire-lang/Avenys-rust
+          path: avenys-src
+          ref: main
+
+      - name: Build the Mire compiler (Avenys) in release mode
+        working-directory: avenys-src
+        env:
+          LLVM_CONFIG_PATH: /usr/bin/llvm-config-22
+        run: cargo build --release
+
+      - name: Install Mire stdlib into the Owl library directory
+        run: |
+          mkdir -p "$HOME/.owl/libs/mire@2.0.0-beta"
+          cp -a src/* "$HOME/.owl/libs/mire@2.0.0-beta/"
+          cp owl.toml "$HOME/.owl/libs/mire@2.0.0-beta/"
+
+      - name: Smoke-check that the compiler can load mire::std and mire::vec
+        env:
+          MIRE_LIB_DIR: "$HOME/.owl/libs"
+          MIRE_BIN: "$GITHUB_WORKSPACE/avenys-src/target/release/mire"
+        run: |
+          mkdir -p /tmp/mire-smoke
+          cat > /tmp/mire-smoke/main.mire <<'MIRE'
+load mire::std
+load mire::vec
+pub fn main: () :i32 {
+    set v = vec::with::capacity::i64(4) mut
+    set v = vec::push::i64(v 7)
+    out::println("smoke ok")
+    return 0 :i32
+}
+MIRE
+          "$MIRE_BIN" build /tmp/mire-smoke/main.mire --debug -O0 \
+            --lib-dir "$HOME/.owl/libs" --no-analysis-cache
+          /tmp/mire-smoke/bin/debug/main
+
+      - name: Run mire::std integration tests
+        env:
+          MIRE_LIB_DIR: "$HOME/.owl/libs"
+          MIRE_BIN: "$GITHUB_WORKSPACE/avenys-src/target/release/mire"
+        run: |
+          MIRE="$MIRE_BIN" bash tests/std_io.sh
