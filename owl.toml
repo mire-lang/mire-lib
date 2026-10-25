@@ -1,6 +1,6 @@
 [project]
 name = "mire"
-version = "2.0.0-beta"
+version = "1.2.4"
 description = "Library for the Mire language - stdlib reorganization (beta)"
 entry = "src/lib.mire"
 
