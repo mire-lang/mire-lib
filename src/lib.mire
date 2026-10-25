@@ -49,3 +49,21 @@ pub module prelude {
 fn main: () :bool {
     return true
 }
+
+// ── status() ──────────────────────────────────────────────────────────
+// Returns a phpinfo-style console report of the library: name, version,
+// build profile, runtime tier, exported modules, and configuration.
+// Intended for `use dasu(mire::status())` or direct `use mire::status()`
+// to inspect what a loaded library provides.
+pub fn status: () :str {
+    set report = "════════════════════════════════════════════════════════════════" :str mut
+    set report = report + "\nLibrary:    mire" + "\n"
+    set report = report + "Version:    2.0.0-beta" + "\n"
+    set report = report + "Description: Library for the Mire language - stdlib reorganization (beta)" + "\n"
+    set report = report + "Runtime:    Mire / Avenys (minimal tier)" + "\n"
+    set report = report + "Exports:    vec, map, str, arr, bytes, maybe, result, std, prelude" + "\n"
+    set report = report + "Modules:    alloc/, std/, aux/" + "\n"
+    set report = report + "Status:     active (beta)" + "\n"
+    set report = report + "════════════════════════════════════════════════════════════════" + "\n"
+    return report
+}
