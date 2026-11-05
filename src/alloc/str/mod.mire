@@ -15,6 +15,7 @@ extern fn rt_strings_contains: (s :&str, sub :&str) :bool lib "pal"
 extern fn rt_strings_starts_with: (s :&str, prefix :&str) :bool lib "pal"
 extern fn rt_strings_ends_with: (s :&str, suffix :&str) :bool lib "pal"
 extern fn rt_strings_index_of: (s :&str, sub :&str) :i64 lib "pal"
+extern fn rt_strings_index_of_from: (s :&str, sub :&str, start :i64) :i64 lib "pal"
 extern fn rt_strings_replace: (s :&str, old :&str, new :&str) :str lib "pal"
 extern fn rt_strings_replace_first: (s :&str, old :&str, new :&str) :str lib "pal"
 extern fn rt_strings_split: (s :&str, sep :&str) :vec[str] lib "pal"
@@ -56,6 +57,10 @@ pub fn ends: () {
 
 // ── index ───────────────────────────────────────────────────────
 pub fn index: (s :&str, sub :&str) :i64 { return rt_strings_index_of(s, sub) }
+// First occurrence at or after `start` (byte offset), or -1. This is the
+// allocation-free way to scan a string in a loop; slicing the tail with
+// `substr` on every hit copies the rest of the input each time.
+pub fn index::from: (s :&str, sub :&str, start :i64) :i64 { return rt_strings_index_of_from(s, sub, start) }
 
 // ── replace ─────────────────────────────────────────────────────
 pub fn replace: (s :&str, old :&str, new :&str) :str { return rt_strings_replace(s, old, new) }
@@ -86,7 +91,7 @@ pub fn from: () {
 
 // ── to ──────────────────────────────────────────────────────────
 pub fn to: () {
-    pub fn i64: (s :&str) :i64 { return rt_string_to_i64(copy(s)) }
+    pub fn i64: (s :&str) :i64 { return rt_string_to_i64(s) }
 }
 
 // ── concat / copy ───────────────────────────────────────────────

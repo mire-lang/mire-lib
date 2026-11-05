@@ -7,6 +7,7 @@ module vec
 
 // ── Runtime externs (via PAL) ────────────────────────────────────────────
 extern fn rt_vecs_len: (list :&anything) :i64 lib "pal"
+extern fn rt_ptr_add: (base :ptr, delta :i64) :ptr lib "pal"
 extern fn rt_vecs_with_capacity_i64: (capacity :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_i64: (list :vec[i64], value :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_ptr: (list :vec[str], value :str) :vec[str] lib "pal"
@@ -79,7 +80,37 @@ pub fn remove: (v :&vec[i64], index :i64) { rt_vecs_remove(v, index) }
 pub fn clear: (v :&vec[i64]) { rt_vecs_clear(v) }
 
 // ── sort ────────────────────────────────────────────────────────
-pub fn sort: (v :&vec[i64]) { rt_vecs_sort(v) }
+// Insertion sort kept in Mire rather than delegated to the C runtime. It is
+// the same algorithm the published benchmark and its C/Rust legs use, but it
+// is compiled by LLVM instead of tcc, which does not optimize the hot nested
+// loop.
+//
+// This is the one place in the vector API that walks the buffer through a raw
+// pointer. The sort touches every element at least once, so a bounds check per
+// read and per write costs more than the sort itself; the loop bounds are
+// derived from the vector length once, and only indices in `[0, len)` are
+// formed. `rt_ptr_add` is the builtin that advances by bytes (one word past
+// the length header), and raw-pointer indexing has no bounds check.
+pub fn sort: (v :&vec[i64]) {
+    set data = rt_ptr_add((v :ptr), 8) mut
+    set n = vec::len(v)
+    set i = 1 :i64 mut
+    while i < n {
+        set key = data[i] mut
+        set j = i - 1 :i64 mut
+        set moving = true :bool mut
+        while j >= 0 && moving {
+            if data[j] > key {
+                set data[j + 1] = data[j]
+                set j -= 1
+            } else {
+                set moving = false
+            }
+        }
+        set data[j + 1] = key
+        set i += 1
+    }
+}
 
 // ── reverse ─────────────────────────────────────────────────────
 pub fn reverse: (v :&vec[i64]) :vec[i64] { return rt_vecs_reverse(v) }
