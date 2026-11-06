@@ -1,19 +1,24 @@
 module vec
 
 // Vector operations using PAL for memory management.
-// The core vector operations (push, pop, len, get, etc.) are implemented
-// in the Mire runtime C code and exposed via PAL-compatible externs.
-// TODO: Move vector operations to PAL C library for full C independence.
+//
+// The hot, small operations (`len`, `get`, `set`, `pop`, `with_capacity` and
+// `binary::search`) are written here so LLVM can inline them into the caller.
+// They read the same layout the C runtime uses — capacity at `base[-1]`,
+// length at `base[0]`, data from `base[1]` — so the two implementations stay
+// interchangeable. Everything that is not on a per-element path (growth,
+// sorting, slicing, joining) stays in the tcc-compiled PAL runtime.
+//
+// `push` is deliberately a thin extern call: the MIR code generator already
+// expands `rt_vecs_push_i64` into an inline fast path plus a cold growth call,
+// so its body is as small as it can be and LLVM inlines it at the call site.
 
 // ── Runtime externs (via PAL) ────────────────────────────────────────────
-extern fn rt_vecs_len: (list :&anything) :i64 lib "pal"
+extern fn pal_alloc: (size :i64) :ptr lib "pal"
 extern fn rt_ptr_add: (base :ptr, delta :i64) :ptr lib "pal"
 extern fn rt_vecs_with_capacity_i64: (capacity :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_i64: (list :vec[i64], value :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_ptr: (list :vec[str], value :str) :vec[str] lib "pal"
-extern fn rt_vecs_set_i64: (list :&vec[i64], index :i64, value :i64) lib "pal"
-extern fn rt_vecs_pop: (list :&vec[i64]) :i64 lib "pal"
-extern fn rt_vecs_get_i64: (list :&vec[i64], index :i64) :i64 lib "pal"
 extern fn rt_vecs_get_ptr: (list, index :i64) :str lib "pal"
 extern fn rt_vecs_first: (list :&vec[i64], line :i64, col :i64, file :str) :i64 lib "pal"
 extern fn rt_vecs_last: (list :&vec[i64], line :i64, col :i64, file :str) :i64 lib "pal"
@@ -28,16 +33,36 @@ extern fn rt_vecs_slice: (list :&vec[i64], start :i64, end :i64) :vec[i64] lib "
 extern fn rt_vecs_flatten: (list :&vec[i64]) :vec[i64] lib "pal"
 extern fn rt_vecs_concat: (list :&vec[i64], other :&vec[i64]) lib "pal"
 extern fn rt_vecs_clone: (list :&vec[i64]) :vec[i64] lib "pal"
-extern fn rt_vecs_binary_search: (list :&vec[i64], value :i64) :i64 lib "pal"
 extern fn rt_strings_join_list: (list :&vec[str], sep :&str) :str lib "pal"
 
 // ── len ─────────────────────────────────────────────────────────
-pub fn len: (v :&anything) :i64 { return rt_vecs_len(v) }
+// A null vector has length zero, matching rt_list_len. Reading the header
+// directly keeps the call out of loops that re-read the length each pass.
+pub fn len: (v :&anything) :i64 {
+    set base = (v :ptr)
+    if base == 0 { return 0 }
+    return base[0]
+}
 
 // ── with::capacity ──────────────────────────────────────────────
 pub fn with: () {
     pub fn capacity: () {
-        pub fn i64: (capacity :i64) :vec[i64] { return rt_vecs_with_capacity_i64(capacity) }
+        // Allocate the same `[capacity][length][data]` block as
+        // rt_list_create: 16 bytes of header plus one word per element.
+        // `rt_list_free` frees `data - 8`, so the PAL allocation stays the
+        // matching deallocator. Absurd capacities and allocation failure fall
+        // back to C, which owns the overflow checks.
+        pub fn i64: (capacity :i64) :vec[i64] {
+            set cap = capacity mut
+            if cap < 4 { set cap = 4 }
+            if cap > 1152921504606846974 { return rt_vecs_with_capacity_i64(capacity) }
+            set hdr = pal_alloc(16 + cap * 8) mut
+            if hdr == 0 { return rt_vecs_with_capacity_i64(capacity) }
+            set hdr[0] = cap
+            set hdr[1] = 0
+            set data = rt_ptr_add(hdr 8)
+            return data
+        }
     }
 }
 
@@ -48,18 +73,41 @@ pub fn push: () {
 }
 
 // ── pop ─────────────────────────────────────────────────────────
+// Returns 0 when the vector is null or empty, matching rt_list_pop.
 pub fn pop: () {
-    pub fn i64: (v :&vec[i64]) :i64 { return rt_vecs_pop(v) }
+    pub fn i64: (v :&vec[i64]) :i64 {
+        set base = (v :ptr) mut
+        if base == 0 { return 0 }
+        set len = base[0]
+        if len <= 0 { return 0 }
+        set value = base[len]
+        set base[0] = len - 1
+        return value
+    }
 }
 
 // ── set ─────────────────────────────────────────────────────────
+// Out-of-range stores are silently ignored, matching rt_list_set_i64.
 pub fn set: () {
-    pub fn i64: (v :&vec[i64], index :i64, value :i64) { rt_vecs_set_i64(v, index, value) }
+    pub fn i64: (v :&vec[i64], index :i64, value :i64) {
+        set base = (v :ptr) mut
+        if base == 0 { return }
+        set len = base[0]
+        if index < 0 || index >= len { return }
+        set base[index + 1] = value
+    }
 }
 
 // ── get ─────────────────────────────────────────────────────────
+// Out-of-range reads return 0, matching rt_list_get_i64.
 pub fn get: () {
-    pub fn i64: (v :&vec[i64], index :i64) :i64 { return rt_vecs_get_i64(v, index) }
+    pub fn i64: (v :&vec[i64], index :i64) :i64 {
+        set base = (v :ptr)
+        if base == 0 { return 0 }
+        set len = base[0]
+        if index < 0 || index >= len { return 0 }
+        return base[index + 1]
+    }
     pub fn str: (v :&vec[str], index :i64) :str { return rt_vecs_get_ptr(v, index) }
 }
 
@@ -81,16 +129,16 @@ pub fn clear: (v :&vec[i64]) { rt_vecs_clear(v) }
 
 // ── sort ────────────────────────────────────────────────────────
 // Insertion sort kept in Mire rather than delegated to the C runtime. It is
-// the same algorithm the published benchmark and its C/Rust legs use, but it
-// is compiled by LLVM instead of tcc, which does not optimize the hot nested
+// the same algorithm the published benchmark and its C leg use, but it is
+// compiled by LLVM instead of tcc, which does not optimize the hot nested
 // loop.
 //
-// This is the one place in the vector API that walks the buffer through a raw
-// pointer. The sort touches every element at least once, so a bounds check per
-// read and per write costs more than the sort itself; the loop bounds are
-// derived from the vector length once, and only indices in `[0, len)` are
-// formed. `rt_ptr_add` is the builtin that advances by bytes (one word past
-// the length header), and raw-pointer indexing has no bounds check.
+// The loop walks the buffer through a raw pointer: it touches every element at
+// least once, so a bounds check per read and per write costs more than the
+// sort itself. The loop bounds are derived from the vector length once, and
+// only indices in `[0, len)` are formed. `rt_ptr_add` is the builtin that
+// advances by bytes (one word past the length header), and raw-pointer
+// indexing has no bounds check.
 pub fn sort: (v :&vec[i64]) {
     set data = rt_ptr_add((v :ptr), 8) mut
     set n = vec::len(v)
@@ -142,7 +190,20 @@ pub fn clone: (v :&vec[i64]) :vec[i64] { return rt_vecs_clone(v) }
 
 // ── binary ──────────────────────────────────────────────────────
 pub fn binary: () {
-    pub fn search: (v :&vec[i64], value :i64) :i64 { return rt_vecs_binary_search(v, value) }
+    pub fn search: (v :&vec[i64], value :i64) :i64 {
+        set base = (v :ptr)
+        if base == 0 { return -1 }
+        set len = base[0]
+        set left = 0 :i64 mut
+        set right = len - 1 :i64 mut
+        while left <= right {
+            set mid = left + (right - left) / 2
+            set item = base[mid + 1]
+            if item == value { return mid }
+            if item < value { set left = mid + 1 } else { set right = mid - 1 }
+        }
+        return -1
+    }
 }
 
 // ── join ────────────────────────────────────────────────────────
