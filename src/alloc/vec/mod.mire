@@ -128,35 +128,47 @@ pub fn remove: (v :&vec[i64], index :i64) { rt_vecs_remove(v, index) }
 pub fn clear: (v :&vec[i64]) { rt_vecs_clear(v) }
 
 // ── sort ────────────────────────────────────────────────────────
-// Insertion sort kept in Mire rather than delegated to the C runtime. It is
-// the same algorithm the published benchmark and its C leg use, but it is
-// compiled by LLVM instead of tcc, which does not optimize the hot nested
-// loop.
-//
-// The loop walks the buffer through a raw pointer: it touches every element at
-// least once, so a bounds check per read and per write costs more than the
-// sort itself. The loop bounds are derived from the vector length once, and
+// Quicksort (Lomuto partition, in place) kept in Mire rather than delegated
+// to the C runtime, and rather than the previous insertion sort. It implements
+// the same ordering the published benchmark expects, but the partition walks
+// are compiled by LLVM instead of running through tcc, which does not optimize
+// the hot loop. The partition bounds are derived from the vector length, and
 // only indices in `[0, len)` are formed. `rt_ptr_add` is the builtin that
-// advances by bytes (one word past the length header), and raw-pointer
-// indexing has no bounds check.
+// advances by bytes (one word past the length header), and raw-pointer indexing
+// has no bounds check.
 pub fn sort: (v :&vec[i64]) {
     set data = rt_ptr_add((v :ptr), 8) mut
     set n = vec::len(v)
-    set i = 1 :i64 mut
-    while i < n {
-        set key = data[i] mut
-        set j = i - 1 :i64 mut
-        set moving = true :bool mut
-        while j >= 0 && moving {
-            if data[j] > key {
-                set data[j + 1] = data[j]
-                set j -= 1
+    if n > 1 {
+        sort_range(data, 0, n - 1)
+    }
+}
+
+fn sort_range: (data :ptr, lo :i64, hi :i64) {
+    if lo < hi {
+        set pivot = data[hi] mut
+        set i = lo - 1 :i64 mut
+        set j = lo :i64 mut
+        set done = false :bool mut
+        while done == false {
+            if j > hi - 1 {
+                set done = true
             } else {
-                set moving = false
+                if data[j] <= pivot {
+                    set i += 1
+                    set t = data[i] mut
+                    set data[i] = data[j] mut
+                    set data[j] = t
+                }
+                set j += 1
             }
         }
-        set data[j + 1] = key
-        set i += 1
+        set t = data[i + 1] mut
+        set data[i + 1] = data[hi] mut
+        set data[hi] = t
+        set p = i + 1
+        sort_range(data, lo, p - 1)
+        sort_range(data, p + 1, hi)
     }
 }
 
