@@ -15,14 +15,25 @@ pub fn is: () {
 }
 
 // ── get ─────────────────────────────────────────────────────────
+// `get::i64` calls the flat single-function probe for the common
+// `map[str i64]` shape. The generic runtime path is a chain of small
+// tcc-compiled helpers (public API -> dict -> hash key -> hash string ->
+// string length -> managed check, then the probe -> key equals -> two more
+// lengths), and every call shows up in the two-million-lookup map benchmark.
+// The flat function keeps the same table layout and hash but collapses the
+// chain into one call; other key/value shapes fall back inside it.
+extern fn rt_maps_get_i64_fast: (dict :ptr, key :&str) :i64 lib "pal"
+
 pub fn get: () {
     pub fn str: (m :&anything, key :&str) :str { return pal::map_get_str(m, key) }
-    pub fn i64: (m :&anything, key :&str) :i64 { return pal::map_get_i64(m, key) }
+    pub fn i64: (m :&anything, key :&str) :i64 {
+        return rt_maps_get_i64_fast(m, key)
+    }
 }
 
 // ── set ─────────────────────────────────────────────────────────
 pub fn set: () {
-    pub fn str: (m :ptr, key :&str, value :&str) :ptr { return pal::map_set_str(m, key, value) }
+    pub fn str: (m :ptr, key :&str, value :str) :ptr { return pal::map_set_str(m, key, value) }
     pub fn i64: (m :ptr, key :&str, value :i64) :ptr { return pal::map_set_i64(m, key, value) }
 }
 

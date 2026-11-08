@@ -29,6 +29,7 @@ extern fn rt_string_to_i64: (s :&str) :i64 lib "pal"
 extern fn rt_bool_to_string: (value :i64) :str lib "pal"
 extern fn rt_f64_to_string: (value :f64) :str lib "pal"
 extern fn rt_string_concat: (left :&str, right :&str) :str lib "pal"
+extern fn rt_string_concat_literal_i64: (prefix :&str, value :i64) :str lib "pal"
 extern fn rt_string_copy: (value :&str) :str lib "pal"
 
 // ── len ─────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ pub fn to: () {
 
 // ── concat / copy ───────────────────────────────────────────────
 pub fn concat: (left :&str, right :&str) :str { return rt_string_concat(left, right) }
+pub fn concat_literal_i64: (prefix :&str, value :i64) :str { return rt_string_concat_literal_i64(prefix, value) }
 pub fn copy: (s :&str) :str { return rt_string_copy(s) }
 
 // ── is ──────────────────────────────────────────────────────────

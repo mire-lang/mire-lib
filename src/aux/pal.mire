@@ -203,6 +203,15 @@ extern fn rt_managed_retain: (value: str) lib "pal"
 extern fn rt_managed_free: (value: str) lib "pal"
 extern fn rt_managed_is_managed: (value: &str) :i64 lib "pal"
 
+// ── Memory statistics ──────────────────────────────────────────────────────
+extern fn rt_mem_alloc_count: () :i64 lib "pal"
+extern fn rt_mem_alloc_bytes: () :i64 lib "pal"
+extern fn rt_mem_free_count: () :i64 lib "pal"
+extern fn rt_mem_free_bytes: () :i64 lib "pal"
+extern fn rt_mem_current_bytes: () :i64 lib "pal"
+extern fn rt_mem_peak_bytes: () :i64 lib "pal"
+extern fn rt_mem_reset_stats: () lib "pal"
+
 // Copy `len` bytes out of a raw buffer into a new managed string.
 pub fn managed_from_slice: (src: ptr, len: i64) :str { return rt_managed_from_slice(src, len) }
 
@@ -223,6 +232,15 @@ pub fn str_release: (value: str) { rt_managed_free(value) }
 
 // True (1) when the pointer is a runtime-managed string.
 pub fn str_is_managed: (value: &str) :i64 { return rt_managed_is_managed(value) }
+
+// ── Memory statistics ──────────────────────────────────────────────────────
+pub fn mem_alloc_count: () :i64 { return rt_mem_alloc_count() }
+pub fn mem_alloc_bytes: () :i64 { return rt_mem_alloc_bytes() }
+pub fn mem_free_count: () :i64 { return rt_mem_free_count() }
+pub fn mem_free_bytes: () :i64 { return rt_mem_free_bytes() }
+pub fn mem_current_bytes: () :i64 { return rt_mem_current_bytes() }
+pub fn mem_peak_bytes: () :i64 { return rt_mem_peak_bytes() }
+pub fn mem_reset_stats: () { rt_mem_reset_stats() }
 
 // ── Math ────────────────────────────────────────────────────────────────────
 
@@ -246,6 +264,10 @@ pub fn math_sqrt_f64: (x: f64) :f64 { return rt_math_sqrt(x) }
 
 // Power for f64.
 pub fn math_pow_f64: (x: f64, y: f64) :f64 { return rt_math_pow(x, y) }
+
+// Simple leaf functions for call_overhead benchmark.
+extern fn rt_math_leaf_add: (a: i64, b: i64) :i64 lib "pal"
+extern fn rt_math_leaf_mul: (a: i64, b: i64) :i64 lib "pal"
 
 // ── Maps ────────────────────────────────────────────────────────────────────
 // Backed by the runtime's rt_maps_* string-keyed map (dict) surface.

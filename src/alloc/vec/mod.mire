@@ -14,11 +14,18 @@ module vec
 // so its body is as small as it can be and LLVM inlines it at the call site.
 
 // ── Runtime externs (via PAL) ────────────────────────────────────────────
-extern fn pal_alloc: (size :i64) :ptr lib "pal"
+// `malloc` is bound directly rather than through `pal_alloc`. The PAL wrapper
+// is a tcc-compiled function whose only job is `return malloc(size)`, and the
+// code generator already frees vectors with a direct `@free` call, so the
+// allocation must come from the same libc heap either way. Skipping the
+// wrapper removes a call from the allocate/free pair on the hottest vector
+// path (alloc_pressure allocates and frees one vector per iteration).
+extern fn malloc: (size :i64) :ptr lib "c"
 extern fn rt_ptr_add: (base :ptr, delta :i64) :ptr lib "pal"
 extern fn rt_vecs_with_capacity_i64: (capacity :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_i64: (list :vec[i64], value :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_ptr: (list :vec[str], value :str) :vec[str] lib "pal"
+extern fn rt_vecs_pop_ptr: (list :&vec[str]) :str lib "pal"
 extern fn rt_vecs_get_ptr: (list, index :i64) :str lib "pal"
 extern fn rt_vecs_first: (list :&vec[i64], line :i64, col :i64, file :str) :i64 lib "pal"
 extern fn rt_vecs_last: (list :&vec[i64], line :i64, col :i64, file :str) :i64 lib "pal"
@@ -28,6 +35,7 @@ extern fn rt_vecs_sort: (list :&vec[i64]) lib "pal"
 extern fn rt_vecs_reverse: (list :&vec[i64]) lib "pal"
 extern fn rt_vecs_unique: (list :&vec[i64]) lib "pal"
 extern fn rt_vecs_contains_i64: (list :&vec[i64], value :i64) :bool lib "pal"
+extern fn rt_panic_loc: (msg :str, line :i64, col :i64, file :str) lib "pal"
 extern fn rt_vecs_index_of_i64: (list :&vec[i64], value :i64) :i64 lib "pal"
 extern fn rt_vecs_slice: (list :&vec[i64], start :i64, end :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_flatten: (list :&vec[i64]) :vec[i64] lib "pal"
@@ -56,8 +64,20 @@ pub fn with: () {
             set cap = capacity mut
             if cap < 4 { set cap = 4 }
             if cap > 1152921504606846974 { return rt_vecs_with_capacity_i64(capacity) }
-            set hdr = pal_alloc(16 + cap * 8) mut
+            set hdr = malloc(16 + cap * 8) mut
             if hdr == 0 { return rt_vecs_with_capacity_i64(capacity) }
+            set hdr[0] = cap
+            set hdr[1] = 0
+            set data = rt_ptr_add(hdr 8)
+            return data
+        }
+        pub fn str: (capacity :i64) :vec[str] {
+            set cap = capacity mut
+            if cap < 4 { set cap = 4 }
+            // String vectors use the same layout as i64 vectors (8-byte pointers).
+            // Inline allocation avoids a call to the i64-specific extern.
+            set hdr = malloc(16 + cap * 8) mut
+            if hdr == 0 { return (0 :ptr) }
             set hdr[0] = cap
             set hdr[1] = 0
             set data = rt_ptr_add(hdr 8)
@@ -80,10 +100,11 @@ pub fn pop: () {
         if base == 0 { return 0 }
         set len = base[0]
         if len <= 0 { return 0 }
-        set value = base[len]
+        set val_i64 = base[len]
         set base[0] = len - 1
-        return value
+        return val_i64
     }
+    pub fn str: (v :&vec[str]) :str { return rt_vecs_pop_ptr(v) }
 }
 
 // ── set ─────────────────────────────────────────────────────────
@@ -111,81 +132,237 @@ pub fn get: () {
     pub fn str: (v :&vec[str], index :i64) :str { return rt_vecs_get_ptr(v, index) }
 }
 
-// ── first ───────────────────────────────────────────────────────
+// ── first / last ────────────────────────────────────────────────
+// Both read the header directly, so LLVM inlines them and the empty-vector
+// panic stays a cold call. They used to forward to `rt_vecs_first`/`last` in
+// the tcc-compiled PAL, which meant a call and an argument shuffle for an
+// indexed load.
 pub fn first: () {
-    pub fn i64: (v :&vec[i64]) :i64 { return rt_vecs_first(v, 0, 0, "") }
+    pub fn i64: (v :&vec[i64]) :i64 {
+        set base = (v :ptr) mut
+        if base != 0 {
+            set len = base[0]
+            if len > 0 { return base[1] }
+        }
+        rt_panic_loc("called first() on empty vec", 0, 0, "")
+        return 0
+    }
 }
 
-// ── last ────────────────────────────────────────────────────────
 pub fn last: () {
-    pub fn i64: (v :&vec[i64]) :i64 { return rt_vecs_last(v, 0, 0, "") }
+    pub fn i64: (v :&vec[i64]) :i64 {
+        set base = (v :ptr) mut
+        if base != 0 {
+            set len = base[0]
+            if len > 0 { return base[len] }
+        }
+        rt_panic_loc("called last() on empty vec", 0, 0, "")
+        return 0
+    }
 }
 
 // ── remove ──────────────────────────────────────────────────────
 pub fn remove: (v :&vec[i64], index :i64) { rt_vecs_remove(v, index) }
 
 // ── clear ───────────────────────────────────────────────────────
-pub fn clear: (v :&vec[i64]) { rt_vecs_clear(v) }
+pub fn clear: (v :&vec[i64]) {
+    set base = (v :ptr) mut
+    if base != 0 { set base[0] = 0 }
+}
 
 // ── sort ────────────────────────────────────────────────────────
-// Quicksort (Lomuto partition, in place) kept in Mire rather than delegated
-// to the C runtime, and rather than the previous insertion sort. It implements
-// the same ordering the published benchmark expects, but the partition walks
-// are compiled by LLVM instead of running through tcc, which does not optimize
-// the hot loop. The partition bounds are derived from the vector length, and
-// only indices in `[0, len)` are formed. `rt_ptr_add` is the builtin that
-// advances by bytes (one word past the length header), and raw-pointer indexing
-// has no bounds check.
+// Introsort, in place, kept in Mire rather than delegated to the C runtime.
+//
+// Three pieces work together: median-of-three quicksort (Hoare partition) for
+// the broad strokes, insertion sort for ranges of 16 or fewer, and a heapsort
+// fallback once the recursion budget (`2 * floor(log2 n)`) is spent, so an
+// adversarial input cannot degrade to quadratic time. The smaller side of a
+// partition is the one recursed into and the larger one is iterated on, which
+// keeps stack depth at O(log n) regardless of how the pivot splits.
+//
+// The previous implementation was a Lomuto quicksort with the last element as
+// pivot: one extra `done` flag test per element, a swap per smaller element,
+// and quadratic behaviour on already-sorted input. LLVM compiles these loops
+// and the partition walks a raw pointer, so the generated code is a tight
+// compare/swap loop rather than a tcc call.
+//
+// `rt_ptr_add` advances by bytes (one word past the length header) and
+// raw-pointer indexing has no bounds check; only indices in `[0, len)` are
+// formed.
 pub fn sort: (v :&vec[i64]) {
     set data = rt_ptr_add((v :ptr), 8) mut
     set n = vec::len(v)
     if n > 1 {
-        sort_range(data, 0, n - 1)
+        sort_loop(data, 0, n - 1, 2 * sort_floor_log2(n))
     }
 }
 
-fn sort_range: (data :ptr, lo :i64, hi :i64) {
-    if lo < hi {
-        set pivot = data[hi] mut
-        set i = lo - 1 :i64 mut
-        set j = lo :i64 mut
-        set done = false :bool mut
-        while done == false {
-            if j > hi - 1 {
-                set done = true
-            } else {
-                if data[j] <= pivot {
-                    set i += 1
-                    set t = data[i] mut
-                    set data[i] = data[j] mut
-                    set data[j] = t
-                }
-                set j += 1
+fn sort_floor_log2: (n :i64) :i64 {
+    set r = 0 :i64 mut
+    set x = n mut
+    while x > 1 {
+        set x = x >> 1
+        set r += 1
+    }
+    return r
+}
+
+fn sort_median_of_three: (a :i64, b :i64, c :i64) :i64 {
+    if a < b {
+        if b < c { return b }
+        if a < c { return c }
+        return a
+    }
+    if a < c { return a }
+    if b < c { return c }
+    return b
+}
+
+fn sort_swap: (data :ptr, i :i64, j :i64) {
+    set t = data[i] mut
+    set data[i] = data[j]
+    set data[j] = t
+}
+
+fn sort_loop: (data :ptr, lo :i64, hi :i64, depth :i64) {
+    set left = lo mut
+    set right = hi mut
+    set budget = depth mut
+    while left < right {
+        if right - left < 16 {
+            sort_insertion(data, left, right)
+            return
+        }
+        if budget <= 0 {
+            sort_heap(data, left, right)
+            return
+        }
+        set budget -= 1
+        set mid = left + (right - left) / 2
+        set pivot = sort_median_of_three(data[left], data[mid], data[right])
+        set i = left mut
+        set j = right mut
+        while i <= j {
+            while data[i] < pivot { set i += 1 }
+            while data[j] > pivot { set j -= 1 }
+            if i <= j {
+                sort_swap(data, i, j)
+                set i += 1
+                set j -= 1
             }
         }
-        set t = data[i + 1] mut
-        set data[i + 1] = data[hi] mut
-        set data[hi] = t
-        set p = i + 1
-        sort_range(data, lo, p - 1)
-        sort_range(data, p + 1, hi)
+        if j - left < right - i {
+            if left < j { sort_loop(data, left, j, budget) }
+            set left = i
+        } else {
+            if i < right { sort_loop(data, i, right, budget) }
+            set right = j
+        }
+    }
+}
+
+fn sort_insertion: (data :ptr, lo :i64, hi :i64) {
+    set i = lo + 1 :i64 mut
+    while i <= hi {
+        set key = data[i] mut
+        set j = i - 1 :i64 mut
+        while j >= lo {
+            if data[j] <= key { break }
+            set data[j + 1] = data[j]
+            set j -= 1
+        }
+        set data[j + 1] = key
+        set i += 1
+    }
+}
+
+fn sort_sift_down: (data :ptr, base :i64, root :i64, n :i64) {
+    set r = root mut
+    set running = true :bool mut
+    while running {
+        set child = 2 * r + 1 mut
+        if child >= n {
+            set running = false
+        } else {
+            if child + 1 < n && data[base + child] < data[base + child + 1] {
+                set child += 1
+            }
+            if data[base + r] >= data[base + child] {
+                set running = false
+            } else {
+                sort_swap(data, base + r, base + child)
+                set r = child
+            }
+        }
+    }
+}
+
+fn sort_heap: (data :ptr, lo :i64, hi :i64) {
+    set n = hi - lo + 1
+    set start = n / 2 - 1 mut
+    while start >= 0 {
+        sort_sift_down(data, lo, start, n)
+        set start -= 1
+    }
+    set end = n - 1 mut
+    while end > 0 {
+        sort_swap(data, lo, lo + end)
+        sort_sift_down(data, lo, 0, end)
+        set end -= 1
     }
 }
 
 // ── reverse ─────────────────────────────────────────────────────
-pub fn reverse: (v :&vec[i64]) :vec[i64] { return rt_vecs_reverse(v) }
+// Returns a new vector with the elements in the opposite order, matching
+// `rt_lists_reverse`. The capacity is reserved up front, so the pushes below
+// are the only work the loop does.
+pub fn reverse: (v :&vec[i64]) :vec[i64] {
+    set n = vec::len(v)
+    set cap = 4 :i64 mut
+    if n > 0 { set cap = n }
+    set out = vec::with::capacity::i64(cap) mut
+    set i = n - 1 :i64 mut
+    while i >= 0 {
+        set out = vec::push::i64(out, vec::get::i64(v, i))
+        set i -= 1
+    }
+    return out
+}
 
 // ── unique ──────────────────────────────────────────────────────
 pub fn unique: (v :&vec[i64]) :vec[i64] { return rt_vecs_unique(v) }
 
 // ── contains ────────────────────────────────────────────────────
+// A linear scan over the elements, in Mire rather than through the PAL. It
+// reads the same `base[1..len]` window `vec::get` does, and returns a real
+// `bool` instead of relying on an `int64_t` return crossing into an `i1`.
 pub fn contains: () {
-    pub fn i64: (v :&vec[i64], value :i64) :bool { return rt_vecs_contains_i64(v, value) }
+    pub fn i64: (v :&vec[i64], value :i64) :bool {
+        set base = (v :ptr) mut
+        if base == 0 { return false }
+        set len = base[0]
+        set i = 0 :i64 mut
+        while i < len {
+            if base[i + 1] == value { return true }
+            set i += 1
+        }
+        return false
+    }
 }
 
 // ── index ───────────────────────────────────────────────────────
 pub fn index: () {
-    pub fn i64: (v :&vec[i64], value :i64) :i64 { return rt_vecs_index_of_i64(v, value) }
+    pub fn i64: (v :&vec[i64], value :i64) :i64 {
+        set base = (v :ptr) mut
+        if base == 0 { return -1 }
+        set len = base[0]
+        set i = 0 :i64 mut
+        while i < len {
+            if base[i + 1] == value { return i }
+            set i += 1
+        }
+        return -1
+    }
 }
 
 // ── slice ───────────────────────────────────────────────────────
