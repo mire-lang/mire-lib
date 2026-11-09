@@ -57,10 +57,13 @@ jobs:
           cp owl.toml "$HOME/.owl/libs/mire/"
 
       - name: Smoke-check that the compiler can load mire::std and mire::vec
-        env:
-          MIRE_LIB_DIR: "$HOME/.owl/libs"
-          MIRE_BIN: "$GITHUB_WORKSPACE/avenys-src/target/release/mire"
         run: |
+          # Env values in `env:` are not shell-expanded by GitHub, so resolve
+          # the paths inside the script where $GITHUB_WORKSPACE and $HOME are
+          # real shell variables.
+          MIRE_BIN="$GITHUB_WORKSPACE/avenys-src/target/release/mire"
+          MIRE_LIB_DIR="$HOME/.owl/libs"
+          export MIRE_BIN MIRE_LIB_DIR
           mkdir -p /tmp/mire-smoke
           cat > /tmp/mire-smoke/main.mire <<'MIRE'
           load mire::std
@@ -73,12 +76,12 @@ jobs:
           }
           MIRE
           "$MIRE_BIN" build /tmp/mire-smoke/main.mire --debug -O0 \
-            --lib-dir "$HOME/.owl/libs" --no-analysis-cache
+            --lib-dir "$MIRE_LIB_DIR" --no-analysis-cache
           /tmp/mire-smoke/bin/debug/main
 
       - name: Run mire::std integration tests
-        env:
-          MIRE_LIB_DIR: "$HOME/.owl/libs"
-          MIRE_BIN: "$GITHUB_WORKSPACE/avenys-src/target/release/mire"
         run: |
+          MIRE_BIN="$GITHUB_WORKSPACE/avenys-src/target/release/mire"
+          MIRE_LIB_DIR="$HOME/.owl/libs"
+          export MIRE_BIN MIRE_LIB_DIR
           MIRE="$MIRE_BIN" bash tests/std_io.sh
