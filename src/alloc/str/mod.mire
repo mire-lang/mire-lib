@@ -30,7 +30,11 @@ extern fn rt_bool_to_string: (value :i64) :str lib "pal"
 extern fn rt_f64_to_string: (value :f64) :str lib "pal"
 extern fn rt_string_concat: (left :&str, right :&str) :str lib "pal"
 extern fn rt_string_concat_literal_i64: (prefix :&str, value :i64) :str lib "pal"
+extern fn rt_string_append_owned: (value :str, suffix :&str) :str lib "pal"
 extern fn rt_string_copy: (value :&str) :str lib "pal"
+// Fast memory copy: compiler lowers to LLVM memcpy intrinsic
+extern fn rt_memcpy_fast: (dst :ptr, src :ptr, size :i64) lib "pal"
+extern fn rt_ptr_add: (p :ptr, delta :i64) :ptr lib "pal"
 
 // ── len ─────────────────────────────────────────────────────────
 pub fn len: (s :&str) :i64 { return rt_strings_len(s) }
@@ -98,7 +102,18 @@ pub fn to: () {
 // ── concat / copy ───────────────────────────────────────────────
 pub fn concat: (left :&str, right :&str) :str { return rt_string_concat(left, right) }
 pub fn concat_literal_i64: (prefix :&str, value :i64) :str { return rt_string_concat_literal_i64(prefix, value) }
+
+// Append to a string that the caller owns exclusively (refcount == 1).
+// Reuses the string's buffer when possible to avoid allocation.
+pub fn push_str: (value :str, suffix :&str) :str { return rt_string_append_owned(value, suffix) }
 pub fn copy: (s :&str) :str { return rt_string_copy(s) }
+
+// ── memcpy ──────────────────────────────────────────────────────
+// Compiler intrinsic: lowered to LLVM memcpy for vectorized copy.
+pub fn memcpy: (dst :ptr, src :ptr, size :i64) { rt_memcpy_fast(dst, src, size) }
+
+// Pointer arithmetic: add byte offset to pointer.
+pub fn ptr_add: (p :ptr, delta :i64) :ptr { return rt_ptr_add(p, delta) }
 
 // ── is ──────────────────────────────────────────────────────────
 pub fn is: () {
