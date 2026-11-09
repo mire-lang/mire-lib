@@ -51,9 +51,12 @@ pub fn is_tty: () :bool { return in::is_tty() }
 
 // ── both ───────────────────────────────────────────────────────────────────
 
+cons SEL_OUT = 1 :i64
+cons SEL_ERR = 2 :i64
+
 // Flush both output streams. Returns 0 when both flushed cleanly, -1 otherwise.
 // Exits run this for you; it is here for a program that forks or execs and
 // needs its own output on disk before the child starts.
 pub fn flush: () :i64 {
-    return pal::io_flush(out::SEL_OUT) + pal::io_flush(err::SEL_ERR)
+    return pal::io_flush(SEL_OUT) + pal::io_flush(SEL_ERR)
 }
