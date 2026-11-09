@@ -47,9 +47,9 @@ jobs:
 
       - name: Install Mire stdlib into the Owl library directory
         run: |
-          mkdir -p "$HOME/.owl/libs/mire@2.0.0-beta"
-          cp -a src/* "$HOME/.owl/libs/mire@2.0.0-beta/"
-          cp owl.toml "$HOME/.owl/libs/mire@2.0.0-beta/"
+          mkdir -p "$HOME/.owl/libs/mire@2.1.0-beta"
+          cp -a src/* "$HOME/.owl/libs/mire@2.1.0-beta/"
+          cp owl.toml "$HOME/.owl/libs/mire@2.1.0-beta/"
 
       - name: Smoke-check that the compiler can load mire::std and mire::vec
         env:
