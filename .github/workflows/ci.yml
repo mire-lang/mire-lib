@@ -63,15 +63,15 @@ jobs:
         run: |
           mkdir -p /tmp/mire-smoke
           cat > /tmp/mire-smoke/main.mire <<'MIRE'
-load mire::std
-load mire::vec
-pub fn main: () :i32 {
-    set v = vec::with::capacity::i64(4) mut
-    set v = vec::push::i64(v 7)
-    out::println("smoke ok")
-    return 0 :i32
-}
-MIRE
+          load mire::std
+          load mire::vec
+          pub fn main: () :i32 {
+              set v = vec::with::capacity::i64(4) mut
+              set v = vec::push::i64(v 7)
+              out::println("smoke ok")
+              return 0 :i32
+          }
+          MIRE
           "$MIRE_BIN" build /tmp/mire-smoke/main.mire --debug -O0 \
             --lib-dir "$HOME/.owl/libs" --no-analysis-cache
           /tmp/mire-smoke/bin/debug/main
