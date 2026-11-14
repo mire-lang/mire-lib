@@ -25,6 +25,7 @@ extern fn rt_ptr_add: (base :ptr, delta :i64) :ptr lib "pal"
 extern fn rt_vecs_with_capacity_i64: (capacity :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_i64: (list :vec[i64], value :i64) :vec[i64] lib "pal"
 extern fn rt_vecs_push_ptr: (list :vec[str], value :str) :vec[str] lib "pal"
+extern fn rt_vecs_push_str: (list :vec[str], value :&str) :vec[str] lib "pal"
 extern fn rt_vecs_pop_ptr: (list :&vec[str]) :str lib "pal"
 extern fn rt_vecs_get_ptr: (list, index :i64) :str lib "pal"
 extern fn rt_vecs_first: (list :&vec[i64], line :i64, col :i64, file :str) :i64 lib "pal"
@@ -89,7 +90,7 @@ pub fn with: () {
 // ── push ────────────────────────────────────────────────────────
 pub fn push: () {
     pub fn i64: (v :vec[i64], value :i64) :vec[i64] { return rt_vecs_push_i64(v, value) }
-    pub fn str: (v :vec[str], value :str) :vec[str] { return rt_vecs_push_ptr(v, value) }
+    pub fn str: (v :vec[str], value :str) :vec[str] { return rt_vecs_push_str(v, value) }
 }
 
 // ── pop ─────────────────────────────────────────────────────────
