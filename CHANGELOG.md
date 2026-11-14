@@ -2,6 +2,32 @@
 
 All notable changes to the mire standard library.
 
+## [2.1.0-beta] - 2026-11-12
+
+### Added
+
+- **Raw string intrinsics.** `str::push_str`, `str::memcpy` and `str::ptr_add`
+  let library code build binary-safe strings without routing every byte through
+  a managed concatenation.
+- **`vec` sort in Mire.** Quicksort/introsort replaced the insertion-sort path;
+  hot operations read the vector header directly and inline the common cases.
+- **`status()`** returns the package version, tier and namespace list, so
+  `owl export` can verify the library it is packaging.
+
+### Changed
+
+- **PAL bootstrap step 1.** `rt_math_leaf_add` and `rt_math_leaf_mul` are the
+  first math symbols served by the bootstrapped PAL layer instead of the old
+  C dispatch table.
+- **`std/mod.mire` uses local `cons` constants** for `SEL_OUT` / `SEL_ERR`;
+  the module no longer depends on a runtime-provided constant pair.
+
+### Known limits
+
+- JSON and TOML codecs still live in `code/c/` and are **not exported** as
+  modules. Codec ownership moves to `ilogical::format` as part of the ecosystem
+  migration.
+
 ## [2.0.0-beta] - 2026-10-20 (PAL bindings, nested namespaces, `cons` constants)
 
 ### Changed
