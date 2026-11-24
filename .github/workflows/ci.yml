@@ -42,7 +42,7 @@ jobs:
         with:
           repository: mire-lang/Avenys-rust
           path: avenys-src
-          ref: main
+          ref: migrate/pal-to-mire
 
       - name: Build the Mire compiler (Avenys) in release mode
         working-directory: avenys-src
