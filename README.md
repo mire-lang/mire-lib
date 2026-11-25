@@ -53,13 +53,16 @@ pub fn main: () {
 - **`str::from::bool`** takes `:bool` and produces `"true"`/`"false"`.
 - **Padding uses strings**: `str::pad::left/right` accept a `&str` pad value, matching the runtime ABI and allowing multi-byte padding sequences.
 - **Owned optional/result handles**: values returned by `maybe` and `result` are runtime-owned pointers and must be released with the matching `free` function after their last use.
+- **No JSON or TOML codecs**: `ilogical::format` owns both formats in the
+  ecosystem. This package ships no C parser and does not link `libm` for one.
 - **No `version()`**: version is tracked in `owl.toml` and the lockfile.
 
 ## Building
 
 ```bash
 owl build
-owl test
+# or, against this working tree
+mire test tests --lib-dir "$PWD/.."
 ```
 
 ## License

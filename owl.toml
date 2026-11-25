@@ -66,8 +66,5 @@ externs = ["rt_*", "pal_*", "owl_archive_*"]
 extern_libs = ["c", "pal"]
 macros = ["assert", "dbg", "panic", "unreachable", "assert_eq", "assert_ne", "trace_i64"]
 
-[c]
-sources = ["code/c/json_parser.c", "code/c/toml_parser.c"]
-libs = ["m"]
 ["owl@lock"]
 version = "3"

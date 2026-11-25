@@ -1,72 +1,49 @@
 # Running this package's tests
 
-These tests exercise the standard library against the package as the compiler
-resolves it, which means they run against the copy in `~/.owl/libs`, not against
-the source tree next to this file.
+The tests run against this working tree, not against an installed copy, by
+pointing `--lib-dir` at the directory that *contains* the `mire/` package:
 
-That distinction is the whole difficulty. `~/.owl/libs/mire` currently points at
-`mire@1.0.0` while this source tree is 1.2.0, so:
-
-```
-cd <this directory>
-owl test
+```bash
+# from the repository root
+mire test tests --lib-dir "$PWD/.."
+mire test tests/bytes_test.mire --lib-dir "$PWD/.."
 ```
 
-fails every test with `Package 'mire' has no export 'json'` (or `'bytes'`, or
-`'std'`). Those are not test failures. They mean the tests linked the installed
-1.0.0 and found none of the modules added since.
+`--lib-dir` names a directory of packages and the compiler appends `mire`, so
+the parent of this repository is the correct value. This is also what
+`tests/std_io.sh` does; it accepts `MIRE_LIB_DIR` to override the location when
+the library is installed under `~/.owl/libs`.
 
-## Why a self-dependency does not fix it
+## Why not a self-dependency
 
-The obvious fix is a self-dependency, so that `--lib-dir` points at this source
-tree instead of the installed copy. Neither spelling works:
-
-- `mire = { path = "." }` — every `--lib-dir` is a directory *of packages* and the
-  compiler appends the package name, so this makes it look for `./mire` inside
-  this project, which does not exist.
-- `mire = { path = ".." }` — this points at the directory that does contain
-  `mire/`, but the Avenys sandbox denies it. `pal_sbx_permit` rejects any path
-  that resolves outside the project root, so `fs::exists("..")` is `false` and
-  the dependency is reported as `path not found`.
-
-Both are the sandbox working as intended. A package cannot point the compiler at
-its own parent directory, and loosening that to accommodate a cache would let any
-program write outside its tree.
-
-## What actually works
-
-Install the source tree as the active version, so the tests resolve it the same
-way any other project would:
-
-```
-# from this directory
-mire build code/mod.mire --debug -O 0 \
-    --output-dir bin/debug --cache-dir bin/.cache \
-    --runtime minimal --artifact shared \
-    --c-source code/c/json_parser.c --c-lib m \
-    --security-mode strict --extern 'rt_*' --extern 'owl_archive_*' \
-    --extern-lib c --lib-dir "$HOME/.owl/libs"
-
-# then make it the version the compiler resolves
-ln -sfn "$PWD" ~/.owl/libs/mire@1.2.0
-ln -sfn mire@1.2.0 ~/.owl/libs/mire
-
-owl test
-```
-
-The symlink is what `owl install` is supposed to do for you. Until it can
-(`install::package` is currently a stub that reports "skipped due to compiler
-ownership issues"), the two `ln` commands are the manual equivalent. They point
-at this directory, so the tests track the working tree.
+A `mire = { path = ".." }` entry in `owl.toml` looks equivalent, but the Avenys
+sandbox rejects a dependency that resolves outside the project root, so the
+dependency is reported as `path not found`. The flag keeps the resolution
+explicit without loosening the sandbox. `mire = { path = "." }` does not work
+either: the compiler appends `mire`, so it looks for `./mire` inside this
+repository.
 
 ## Test files
 
 | File | Covers |
 |---|---|
 | `bytes_test.mire` | raw buffers, endianness, embedded NULs, `bytes::str_len` |
-| `json_test.mire` | the JSON parser/serializer wrapper |
-| `std_io.mire` | standard streams, with `std_io.sh` driving the shell side |
+| `std_io.mire` | standard streams; `std_io.sh` drives the shell side |
 
-The suite is small. The bulk of the language's behaviour is covered by the
-compiler's own tests in `../avenys` (`owl test` there runs 293 assertions), not
-here.
+`std_io.sh` builds small probe programs into a scratch directory, wires stdin to
+a controlled pipe, and compares stdout and stderr separately. That is the only
+place NUL and CRLF handling is proven end to end, because a `@[test]` function
+cannot capture its own streams.
+
+```bash
+tests/std_io.sh /path/to/mire
+# or
+MIRE=/path/to/mire tests/std_io.sh
+```
+
+## CI
+
+`.github/workflows/ci.yml` builds Avenys from `migrate/pal-to-mire`, copies
+`src/` and `owl.toml` into `~/.owl/libs/mire`, smoke-checks `mire::std` and
+`mire::vec`, and runs `tests/std_io.sh`. The language itself is covered by the
+compiler's own suite in `../avenys`; these files only cover this package.

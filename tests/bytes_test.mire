@@ -1,7 +1,7 @@
 // bytes module tests: allocation, single and multi-byte access, and the
 // string/buffer conversions that binary framing depends on.
 //
-//   cd mire && owl test
+//   mire test tests/bytes_test.mire --lib-dir "$PWD/.."
 
 load mire::bytes
 

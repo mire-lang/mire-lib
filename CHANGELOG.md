@@ -22,11 +22,17 @@ All notable changes to the mire standard library.
 - **`std/mod.mire` uses local `cons` constants** for `SEL_OUT` / `SEL_ERR`;
   the module no longer depends on a runtime-provided constant pair.
 
+### Removed
+
+- **The C JSON and TOML codecs.** `code/c/json_parser.c`,
+  `code/c/toml_parser.c`, `code/mod.mire`, the `[c]` build block and
+  `tests/json_test.mire` are gone. `ilogical::format` owns both formats in pure
+  Mire, so this package no longer links a C codec or `libm` for it.
+
 ### Known limits
 
-- JSON and TOML codecs still live in `code/c/` and are **not exported** as
-  modules. Codec ownership moves to `ilogical::format` as part of the ecosystem
-  migration.
+- JSON and TOML are provided by `ilogical::format`, not this package. `mire`
+  has no codec of its own and does not depend on the old C parsers.
 
 ## [2.0.0-beta] - 2026-10-20 (PAL bindings, nested namespaces, `cons` constants)
 
